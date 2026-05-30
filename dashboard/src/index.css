@@ -1,0 +1,331 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,300;0,14..32,400;0,14..32,500;0,14..32,600;0,14..32,700;1,14..32,400&family=JetBrains+Mono:wght@400;500&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  /* ═══════════════════════════════════════
+     DARK theme — transparent for spiral
+     ═══════════════════════════════════════ */
+  :root {
+    --surface-0:  rgba(8, 8, 10, 0.0);
+    --surface-1:  rgba(12, 12, 16, 0.45);
+    --surface-2:  rgba(18, 18, 24, 0.30);
+    --surface-3:  rgba(32, 32, 44, 0.55);
+    --border:     rgba(90, 90, 120, 0.30);
+    --border-hi:  rgba(129, 140, 248, 0.55);
+    --text-1:     #f0f0f8;
+    --text-2:     #9898b8;
+    --text-3:     #585878;
+    --accent:     #818cf8;
+    --accent-dim: #1e1b4b;
+    --green:      #34d399;
+    --amber:      #fbbf24;
+    --red:        #f87171;
+    --glass-bg:   rgba(14, 14, 22, 0.28);
+    --glass-blur: 24px;
+    --glass-border: rgba(129, 140, 248, 0.18);
+    --glass-shine:  rgba(255, 255, 255, 0.05);
+    --shadow-card:  0 8px 32px rgba(0,0,0,0.45), 0 2px 8px rgba(0,0,0,0.30);
+    /* Hover glow — overridden per-card by JS */
+    --glow-color:  rgba(129,140,248,0.65);
+    --glow-mid:    rgba(129,140,248,0.32);
+    --glow-outer:  rgba(129,140,248,0.13);
+    --glow-sparkle:rgba(129,140,248,0.40);
+    color-scheme: dark;
+  }
+
+  /* ═══════════════════════════════════════
+     LIGHT theme
+     ═══════════════════════════════════════ */
+  html[data-theme="light"] {
+    --surface-0:  #eef0f8;
+    --surface-1:  rgba(255,255,255,0.88);
+    --surface-2:  rgba(255,255,255,0.82);
+    --surface-3:  rgba(235,235,248,0.90);
+    --border:     rgba(180,180,210,0.50);
+    --border-hi:  rgba(99,102,241,0.60);
+    --text-1:     #0c0c20;
+    --text-2:     #44446a;
+    --text-3:     #8080a8;
+    --accent:     #6366f1;
+    --accent-dim: #eef2ff;
+    --green:      #059669;
+    --amber:      #d97706;
+    --red:        #dc2626;
+    --glass-bg:   rgba(255,255,255,0.72);
+    --glass-blur: 20px;
+    --glass-border: rgba(99,102,241,0.20);
+    --glass-shine:  rgba(255,255,255,0.70);
+    --shadow-card:  0 4px 20px rgba(0,0,0,0.08), 0 1px 4px rgba(0,0,0,0.05);
+    --glow-color:  rgba(99,102,241,0.50);
+    --glow-mid:    rgba(99,102,241,0.25);
+    --glow-outer:  rgba(99,102,241,0.10);
+    --glow-sparkle:rgba(99,102,241,0.30);
+    color-scheme: light;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+  body {
+    background: var(--surface-0);
+    color: var(--text-1);
+    font-family: 'Inter', ui-sans-serif, system-ui;
+    font-size: 13.5px;
+    line-height: 1.55;
+  }
+}
+
+
+/* ═══════════════════════════════════════════════════════════
+   FROSTED GLASS CARD  (.fgc)
+   ═══════════════════════════════════════════════════════════ */
+.fgc {
+  position: relative;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: 14px;
+  box-shadow: var(--shadow-card);
+  backdrop-filter: blur(var(--glass-blur)) saturate(160%);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(160%);
+  /* Smooth spring-return (override to fast on mouseenter) */
+  transition:
+    transform   0.55s cubic-bezier(0.22, 1, 0.36, 1),
+    border-color 0.25s ease,
+    box-shadow  0.35s ease,
+    filter      0.3s  ease;
+  overflow: hidden;
+  transform-style: preserve-3d;
+  will-change: transform, box-shadow, filter;
+  cursor: default;
+}
+
+/* Top-edge glass shimmer */
+.fgc::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 14px;
+  background: linear-gradient(135deg, var(--glass-shine) 0%, transparent 50%);
+  pointer-events: none;
+  z-index: 1;
+  transition: opacity 0.3s;
+}
+
+/* Glare that follows the mouse */
+.fgc-glare {
+  position: absolute;
+  width: 380px;
+  height: 380px;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle at center,
+    rgba(255, 255, 255, 0.18) 0%,
+    rgba(255, 255, 255, 0.06) 35%,
+    transparent 70%
+  );
+  pointer-events: none;
+  z-index: 2;
+  transform: translate(
+    calc(var(--mouse-x, 50%) - 190px),
+    calc(var(--mouse-y, 50%) - 190px)
+  );
+  transition: transform 0.04s linear, opacity 0.3s;
+  opacity: 0;
+}
+
+/* Corner sparkle (top-right) */
+.fgc-sparkle {
+  position: absolute;
+  top: -1px;
+  right: -1px;
+  width: 80px;
+  height: 80px;
+  pointer-events: none;
+  z-index: 2;
+  background: radial-gradient(circle at 100% 0%, var(--glow-sparkle, rgba(129,140,248,0.4)) 0%, transparent 65%);
+  border-radius: 0 14px 0 0;
+  opacity: 0;
+  transition: opacity 0.25s;
+}
+
+/* ── HOVER STATE — maximum intensity ── */
+.fgc:hover {
+  border-color: rgba(255, 255, 255, 0.30);
+  box-shadow:
+    /* Deep lift shadow */
+    0 24px 64px rgba(0, 0, 0, 0.55),
+    0  8px 24px rgba(0, 0, 0, 0.35),
+    /* Tight accent ring */
+    0  0  0   1px var(--glow-color),
+    /* Mid halo — picks up per-card color */
+    0  0  28px 6px var(--glow-mid),
+    /* Outer soft bloom */
+    0  0  70px 12px var(--glow-outer),
+    /* Inset top shimmer edge */
+    inset 0 1px 0 rgba(255, 255, 255, 0.20);
+  filter: brightness(1.14) saturate(1.30);
+}
+
+.fgc:hover::before    { opacity: 1; }
+.fgc:hover .fgc-glare   { opacity: 1; }
+.fgc:hover .fgc-sparkle { opacity: 1; }
+
+/* Ensure all direct content is above pseudo layers */
+.fgc > *:not(.fgc-glare):not(.fgc-sparkle) {
+  position: relative;
+  z-index: 3;
+}
+
+/* ── Aliases ── */
+.card       { @apply fgc; }
+.glass-card { @apply fgc; }
+
+
+@layer components {
+  /* ── Sidebar nav items ── */
+  .nav-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-2);
+    transition: background 0.15s, color 0.15s, border-color 0.15s, box-shadow 0.15s, transform 0.15s;
+    cursor: pointer;
+    border: 1px solid transparent;
+  }
+  .nav-item:hover {
+    background: rgba(129,140,248,0.10);
+    color: var(--text-1);
+    border-color: rgba(129,140,248,0.25);
+    box-shadow: 0 0 16px rgba(129,140,248,0.18), inset 0 1px 0 rgba(255,255,255,0.08);
+    transform: translateX(3px);
+  }
+  .nav-item.active {
+    background: rgba(129,140,248,0.14);
+    border-color: rgba(129,140,248,0.40);
+    color: var(--text-1);
+    box-shadow: 0 0 12px rgba(129,140,248,0.20);
+  }
+  .glass-nav-active   { @apply nav-item active; }
+  .glass-nav-inactive { @apply nav-item; }
+
+  /* ── Status badges ── */
+  .badge {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 2px 8px; border-radius: 6px;
+    font-size: 10.5px; font-weight: 600; letter-spacing: 0.03em;
+    transition: filter 0.2s, transform 0.2s, box-shadow 0.2s;
+    cursor: default;
+  }
+  .badge:hover { filter: brightness(1.25); transform: scale(1.07); }
+  .badge-green  { background: rgba(52,211,153,0.12);  color: var(--green);  border: 1px solid rgba(52,211,153,0.25); }
+  .badge-amber  { background: rgba(251,191,36,0.12);  color: var(--amber);  border: 1px solid rgba(251,191,36,0.25); }
+  .badge-red    { background: rgba(248,113,113,0.12); color: var(--red);    border: 1px solid rgba(248,113,113,0.25); }
+  .badge-accent { background: rgba(129,140,248,0.12); color: var(--accent); border: 1px solid rgba(129,140,248,0.25); }
+
+  /* ── Icon button (header) ── */
+  .icon-btn {
+    display: flex; align-items: center; justify-content: center;
+    width: 30px; height: 30px; border-radius: 7px;
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.10);
+    color: var(--text-2); cursor: pointer;
+    transition: background 0.15s, color 0.15s, box-shadow 0.2s, transform 0.15s, border-color 0.15s;
+  }
+  .icon-btn:hover {
+    background: rgba(129,140,248,0.18);
+    border-color: rgba(129,140,248,0.45);
+    color: var(--text-1);
+    box-shadow: 0 0 14px rgba(129,140,248,0.35), inset 0 1px 0 rgba(255,255,255,0.12);
+    transform: scale(1.12) translateY(-1px);
+  }
+  .icon-btn:active { transform: scale(0.96); }
+}
+
+
+/* ═══════════════════════════════════════════════════════════
+   INTERACTIVE ELEMENT HOVER CLASSES
+   Used inline in component JSX for max granularity
+   ═══════════════════════════════════════════════════════════ */
+
+/* Funnel bar row hover */
+.funnel-row {
+  padding: 6px 8px;
+  border-radius: 8px;
+  transition: background 0.15s, transform 0.18s, box-shadow 0.18s;
+  cursor: default;
+}
+.funnel-row:hover {
+  background: rgba(255,255,255,0.05);
+  transform: translateX(5px) scale(1.01);
+  box-shadow: -3px 0 12px rgba(129,140,248,0.15);
+}
+
+/* Anomaly alert row hover */
+.anomaly-row {
+  transition: transform 0.18s cubic-bezier(0.22,1,0.36,1),
+              box-shadow 0.18s, filter 0.18s, border-color 0.15s;
+  cursor: default;
+}
+.anomaly-row:hover {
+  transform: translateX(4px) scale(1.015);
+  filter: brightness(1.20) saturate(1.30);
+  box-shadow: 0 4px 20px rgba(0,0,0,0.25), -2px 0 12px currentColor;
+}
+
+/* Health table row hover */
+.health-row {
+  transition: background 0.15s, transform 0.15s, box-shadow 0.15s;
+}
+.health-row:hover {
+  background: rgba(129,140,248,0.07) !important;
+  transform: translateX(2px);
+  box-shadow: -2px 0 8px rgba(129,140,248,0.20), inset 0 0 0 1px rgba(129,140,248,0.12);
+}
+
+/* Infra block hover */
+.infra-block {
+  transition: background 0.15s, transform 0.18s, box-shadow 0.2s, filter 0.15s;
+}
+.infra-block:hover {
+  transform: scale(1.04) translateY(-2px);
+  box-shadow: 0 6px 20px rgba(52,211,153,0.22), 0 0 0 1px rgba(52,211,153,0.30);
+  filter: brightness(1.18);
+}
+
+/* SVG zone cell hover — applied via CSS on the rect */
+.zone-cell {
+  transition: filter 0.2s, opacity 0.2s;
+}
+.zone-cell:hover {
+  filter: brightness(1.5) saturate(1.4);
+}
+
+
+/* ── Keyframes ── */
+@keyframes spin     { to { transform: rotate(360deg); } }
+@keyframes pulse    { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.5;transform:scale(.78)} }
+@keyframes fadeUp   { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
+@keyframes barGrow  { from{transform:scaleX(0);transform-origin:left} to{transform:scaleX(1)} }
+@keyframes glow-pulse {
+  0%,100% { box-shadow: 0 0 6px rgba(52,211,153,0.55),  0 0 20px rgba(52,211,153,0.22); }
+  50%     { box-shadow: 0 0 16px rgba(52,211,153,0.80), 0 0 42px rgba(52,211,153,0.42); }
+}
+@keyframes icon-spin {
+  from { transform: rotate(0deg) scale(1); }
+  to   { transform: rotate(360deg) scale(1); }
+}
+
+.animate-fadeUp { animation: fadeUp 0.4s cubic-bezier(0.22,1,0.36,1) both; }
+
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar        { width: 4px; height: 4px; }
+::-webkit-scrollbar-track  { background: transparent; }
+::-webkit-scrollbar-thumb  { background: rgba(129,140,248,0.25); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(129,140,248,0.55); }

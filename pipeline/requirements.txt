@@ -1,0 +1,9 @@
+numpy
+opencv-python-headless
+ultralytics
+supervision==0.20.0
+redis
+structlog
+httpx
+python-dotenv
+pydantic

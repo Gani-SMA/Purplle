@@ -1,0 +1,375 @@
+﻿=== TABLE 0 ===
+PURPLLE TECH CHALLENGE 2026 Store Intelligence API Complete Build Documentation PRD ┬╖ TRD ┬╖ App Flow ┬╖ UI/UX ┬╖ Schema ┬╖ Implementation Plan
+
+=== TABLE 1 ===
+Target | Apex Retail ΓÇö 40 stores, 8 cities
+North Star Metric | Offline Store Conversion Rate
+Architecture | CV Pipeline ΓåÆ Event Stream ΓåÆ REST API ΓåÆ Live Dashboard
+Stack | Python ┬╖ FastAPI ┬╖ PostgreSQL ┬╖ YOLOv8 ┬╖ ByteTrack ┬╖ Docker
+Submission | Git repo + DESIGN.md + CHOICES.md
+Scoring | 100 pts + 10 bonus (Live Dashboard)
+
+=== TABLE 2 ===
+01 | PRD ΓÇö Product Requirements Document The north star. Everything else flows from this.
+
+=== TABLE 3 ===
+Tagline: Real-time offline store analytics ΓÇö turning CCTV footage into the conversion metrics that online retail takes for granted.
+
+=== TABLE 4 ===
+Persona | Goal | Technical Level
+Store Manager | Primary user. Checks daily metrics from a tablet. Needs instant answers: 'How busy is my store right now? Are queues building?' | Non-technical. Needs clear numbers, alerts, dashboard.
+Area Operations Head | Monitors 5ΓÇô8 stores. Compares conversion rates across locations. Identifies underperformers. | Semi-technical. Needs comparative views and trend data.
+Data / Tech Team | Consumes the API directly. Builds custom dashboards and reports on top of the event stream. | Fully technical. Needs clean schema, reliable uptime, structured logs.
+
+=== TABLE 5 ===
+Γ¥î Customer identity or PII collection | Γ¥î Audio processing | Γ¥î Training new models from scratch | Γ¥î Multi-tenant auth | Γ¥î Payment integration | Γ¥î Inventory management | Γ¥î Store-to-store networking topology
+
+=== TABLE 6 ===
+User | Story
+As a store manager | I want to see today's unique visitor count and conversion rate on a single screen so I can instantly know if my store is performing.
+As a store manager | I want to receive an alert when a billing queue is building so I can open an additional counter before customers abandon.
+As a store manager | I want to see which product zones have high dwell but low conversion so I can reposition products or improve merchandising.
+As an area ops head | I want to compare conversion rates across my 5 stores so I can identify which location needs intervention today.
+As a data engineer | I want to POST events in batches and have the API deduplicate by event_id so I can replay events safely without double-counting.
+As an on-call engineer | I want the /health endpoint to show a STALE_FEED warning if any store's camera feed has not sent events in 10+ minutes so I can investigate before it escalates.
+
+=== TABLE 7 ===
+Metric | Target
+Entry/Exit Accuracy | >90% against ground truth on held-out clip
+Staff Exclusion Rate | 100% ΓÇö zero staff events counted in customer metrics
+Re-entry Detection | Same physical person returning ΓåÆ REENTRY event (not second ENTRY)
+Group Handling | 3 people entering together ΓåÆ 3 ENTRY events emitted
+Schema Compliance | 100% of events pass JSON schema validation, all event_ids unique
+API Acceptance Gate | docker compose up + POST /events/ingest + GET /stores/.../metrics all pass
+Test Coverage | >70% statement coverage across all modules
+Anomaly Detection | Queue spike, conversion drop, dead zone all correctly triggered
+Scoring Target | 90+ / 100 points (Part A+B+C+D full marks, Part E bonus)
+
+=== TABLE 8 ===
+02 | TRD ΓÇö Technical Requirements Document Which tech, tools, and APIs ΓÇö every decision locked before a line of code.
+
+=== TABLE 9 ===
+Layer | Technology
+Detection Pipeline | Python 3.11 ┬╖ Ultralytics YOLOv8x ┬╖ ByteTrack ┬╖ torchreid (OSNet-x1-0) ┬╖ OpenCV ┬╖ FFmpeg
+Backend Framework | FastAPI 0.110 ┬╖ Pydantic v2 ┬╖ Uvicorn ┬╖ Python 3.11
+Database | PostgreSQL 16 (via Docker) ┬╖ SQLAlchemy 2.0 (async) ┬╖ Alembic migrations
+Caching / Queue | Redis 7 (event ingest buffer, real-time metric cache, dedup store)
+Live Dashboard | React 18 ┬╖ Vite ┬╖ Tailwind CSS 3 ┬╖ Recharts ┬╖ WebSocket (FastAPI)
+Containerisation | Docker Compose 3.9 ΓÇö services: api, db, redis, dashboard, pipeline-runner
+Testing | pytest 8 ┬╖ pytest-asyncio ┬╖ httpx (async test client) ┬╖ factory-boy
+Structured Logging | structlog ┬╖ JSON formatter ┬╖ trace_id injection via middleware
+AI / ML APIs | Claude Vision API (zone classification, staff detection validation) ┬╖ optional
+
+=== TABLE 10 ===
+Why YOLOv8x: Best trade-off of accuracy vs speed for 1080p/15fps retail footage. YOLOv8x outperforms YOLOv8n/s/m on crowded-scene benchmarks. RT-DETR considered but requires more GPU memory. ByteTrack chosen over DeepSORT ΓÇö no appearance model required at tracking stage, faster, and appearance Re-ID handled separately by OSNet.
+
+=== TABLE 11 ===
+Component | Implementation
+Object Detection | YOLOv8x (ultralytics) ΓÇö class 0 (person) only, conf threshold 0.45
+Multi-Object Tracking | ByteTrack ΓÇö handles occlusion, ID-switch tolerant, 15fps optimised
+Re-ID / visitor_id | OSNet-x1-0 (torchreid) ΓÇö 512-dim appearance embedding per tracklet
+Re-entry Detection | Cosine similarity ΓëÑ0.85 between exit embedding and new entry within 60-min window
+Staff Classification | Uniform colour heuristic (HSV range filter) + optional Claude Vision validation
+Zone Classification | Polygon overlap of bounding box centroid against store_layout.json zones
+Timestamp Derivation | clip_start_utc + (frame_number / fps) ΓåÆ ISO-8601 UTC
+Cross-cam Dedup | Shared Redis set per store: visitor_id seen in last 5s ΓåÆ skip ENTRY re-emit
+Confidence Propagation | YOLO detection conf ├ù ByteTrack track confidence ΓåÆ event.confidence (never dropped)
+
+=== TABLE 12 ===
+{   "event_id":    "uuid-v4",                    // globally unique, generated by pipeline   "store_id":    "STORE_BLR_002",              // from store_layout.json   "camera_id":   "CAM_ENTRY_01",               // source camera   "visitor_id":  "VIS_c8a2f1",                // Re-ID token, unique per visit session   "event_type":  "ZONE_DWELL",                // see catalogue below   "timestamp":   "2026-03-03T14:22:10Z",      // ISO-8601 UTC   "zone_id":     "SKINCARE",                   // null for ENTRY/EXIT   "dwell_ms":    8400,                         // 0 for instantaneous events   "is_staff":    false,                        // pipeline classifies this   "confidence":  0.91,                         // NEVER suppress low-conf events   "metadata": {     "queue_depth": null,                       // integer for BILLING_QUEUE_JOIN     "sku_zone":    "MOISTURISER",              // zone label from store_layout.json     "session_seq": 5                           // ordinal in visitor session   } }
+
+=== TABLE 13 ===
+Endpoint | Behaviour | Response
+POST /events/ingest | Batch ingest Γëñ500 events. Idempotent by event_id. Partial success on malformed. | 200 {accepted, rejected, errors[]}
+GET /stores/{id}/metrics | Unique visitors (excl. staff), conversion rate, avg dwell/zone, queue depth, abandonment rate. | 200 {metrics object} | 404 | 503
+GET /stores/{id}/funnel | EntryΓåÆZoneΓåÆBillingΓåÆPurchase counts + drop-off %. Session unit, no re-entry double-count. | 200 {funnel stages[]}
+GET /stores/{id}/heatmap | Zone visit freq + avg dwell, normalised 0ΓÇô100. data_confidence flag if <20 sessions. | 200 {zones[], data_confidence}
+GET /stores/{id}/anomalies | Active anomalies: queue_spike, conversion_drop, dead_zone. Severity + suggested_action. | 200 {anomalies[]}
+GET /health | Service status, last_event_ts per store, STALE_FEED if >10 min lag. | 200 {status, stores[]}
+
+=== TABLE 14 ===
+/store-intelligence/ Γö£ΓöÇΓöÇ pipeline/ Γöé   Γö£ΓöÇΓöÇ detect.py        # Main detection + tracking (YOLOv8 + ByteTrack) Γöé   Γö£ΓöÇΓöÇ tracker.py       # Re-ID logic (OSNet), visitor_id assignment Γöé   Γö£ΓöÇΓöÇ emit.py          # Event schema, validation, JSONL output Γöé   Γö£ΓöÇΓöÇ staff.py         # Staff classification (HSV + optional VLM) Γöé   Γö£ΓöÇΓöÇ zones.py         # Polygon zone classification from store_layout.json Γöé   ΓööΓöÇΓöÇ run.sh           # One command: process all clips ΓåÆ events.jsonl Γö£ΓöÇΓöÇ app/ Γöé   Γö£ΓöÇΓöÇ main.py          # FastAPI entrypoint, middleware, CORS Γöé   Γö£ΓöÇΓöÇ models.py        # Pydantic v2 event schema + response models Γöé   Γö£ΓöÇΓöÇ ingestion.py     # Ingest, dedup (Redis), persist (Postgres) Γöé   Γö£ΓöÇΓöÇ metrics.py       # Real-time metric computation (no cache) Γöé   Γö£ΓöÇΓöÇ funnel.py        # Funnel + session dedup logic Γöé   Γö£ΓöÇΓöÇ heatmap.py       # Zone normalisation (0ΓÇô100) Γöé   Γö£ΓöÇΓöÇ anomalies.py     # Queue spike, conversion drop, dead zone Γöé   ΓööΓöÇΓöÇ health.py        # Health check, STALE_FEED logic Γö£ΓöÇΓöÇ dashboard/           # React + Vite (Part E) Γöé   Γö£ΓöÇΓöÇ src/ Γöé   Γöé   Γö£ΓöÇΓöÇ App.tsx Γöé   Γöé   Γö£ΓöÇΓöÇ components/  # MetricsCard, Funnel, Heatmap, AnomalyAlert Γöé   Γöé   ΓööΓöÇΓöÇ hooks/       # useWebSocket, useMetrics Γöé   ΓööΓöÇΓöÇ Dockerfile Γö£ΓöÇΓöÇ tests/ Γöé   Γö£ΓöÇΓöÇ test_pipeline.py     # # PROMPT: block at top Γöé   Γö£ΓöÇΓöÇ test_metrics.py      # # PROMPT: block at top Γöé   Γö£ΓöÇΓöÇ test_anomalies.py    # # PROMPT: block at top Γöé   Γö£ΓöÇΓöÇ test_ingestion.py    # Idempotency, partial success, dedup Γöé   ΓööΓöÇΓöÇ test_funnel.py       # Re-entry, session unit tests Γö£ΓöÇΓöÇ docs/ Γöé   Γö£ΓöÇΓöÇ DESIGN.md Γöé   ΓööΓöÇΓöÇ CHOICES.md Γö£ΓöÇΓöÇ migrations/          # Alembic DB migrations Γö£ΓöÇΓöÇ docker-compose.yml Γö£ΓöÇΓöÇ .env.example ΓööΓöÇΓöÇ README.md
+
+=== TABLE 15 ===
+Variable | Value / Notes
+DATABASE_URL | postgresql+asyncpg://user:pass@db:5432/storedb
+REDIS_URL | redis://redis:6379/0
+API_HOST | 0.0.0.0
+API_PORT | 8000
+LOG_LEVEL | INFO
+STALE_FEED_THRESHOLD_MIN | 10
+REENTRY_WINDOW_MIN | 60
+REENTRY_SIMILARITY_THRESHOLD | 0.85
+QUEUE_SPIKE_THRESHOLD | 5
+CONVERSION_DROP_THRESHOLD_PCT | 20
+DEAD_ZONE_MIN | 30
+YOLO_MODEL_PATH | ./pipeline/models/yolov8x.pt
+REID_MODEL_PATH | ./pipeline/models/osnet_x1_0.pth
+ANTHROPIC_API_KEY | (optional) for Claude Vision staff validation
+CORS_ORIGINS | http://localhost:5173
+
+=== TABLE 16 ===
+03 | App Flow ΓÇö Navigation & Data Journey Map Every stage, every event type, every API call path ΓÇö mapped before a line is written.
+
+=== TABLE 17 ===
+CCTV Clips ΓåÆ Detection Pipeline ΓåÆ events.jsonl ΓåÆ POST /events/ingest ΓåÆ PostgreSQL + Redis ΓåÆ GET /stores/{id}/metrics,funnel,heatmap,anomalies ΓåÆ Live Dashboard (WebSocket)
+
+=== TABLE 18 ===
+Step | What Happens
+Step 1 ΓÇö Load | run.sh reads clip paths from config. FFmpeg decodes to frames. store_layout.json loaded for zone polygons.
+Step 2 ΓÇö Detect | YOLOv8x runs on each frame (class 0 = person only, conf ΓëÑ0.45). Returns bounding boxes per frame.
+Step 3 ΓÇö Track | ByteTrack assigns track_id across frames. Handles occlusion, ID-switch.
+Step 4 ΓÇö Re-ID | OSNet extracts 512-dim embedding per tracklet. Cosine similarity check against exit pool for REENTRY.
+Step 5 ΓÇö Staff | HSV colour range check on clothing region. If ambiguous ΓåÆ optional Claude Vision API call.
+Step 6 ΓÇö Zone | Centroid of bbox checked against zone polygon definitions from store_layout.json. Zone ID assigned.
+Step 7 ΓÇö Events | State machine per visitor_id emits typed events: ENTRY ΓåÆ ZONE_ENTER ΓåÆ ZONE_DWELL ΓåÆ ZONE_EXIT ΓåÆ BILLING_QUEUE_JOIN ΓåÆ EXIT.
+Step 8 ΓÇö POS Corr. | pos_transactions.csv correlated: visitor in BILLING zone within 5-min window before tx timestamp ΓåÆ is_converted=true.
+Step 9 ΓÇö Emit | emit.py writes validated events to events.jsonl. Schema validated via Pydantic. Malformed events logged but not suppressed.
+
+=== TABLE 19 ===
+NEW VISITOR DETECTED   ΓööΓöÇΓû║ ENTRY event emitted (visitor_id assigned, session_seq=1)        ΓööΓöÇΓû║ [Check: has this embedding been seen in last 60min?]             Γö£ΓöÇΓû║ YES: emit REENTRY instead of ENTRY             ΓööΓöÇΓû║ NO: fresh ENTRY  VISITOR MOVES TO ZONE   ΓööΓöÇΓû║ ZONE_ENTER emitted        ΓööΓöÇΓû║ [Timer starts: 30s dwell check]             Γö£ΓöÇΓû║ Still in zone at 30s: ZONE_DWELL emitted (repeat every 30s)             ΓööΓöÇΓû║ Leaves zone: ZONE_EXIT emitted  VISITOR ENTERS BILLING ZONE   ΓööΓöÇΓû║ [Check: queue_depth > 0?]        Γö£ΓöÇΓû║ YES: BILLING_QUEUE_JOIN (queue_depth in metadata)        ΓööΓöÇΓû║ NO: standard ZONE_ENTER   ΓööΓöÇΓû║ [Check: POS transaction in next 5 min?]        Γö£ΓöÇΓû║ YES: session marked is_converted=true        ΓööΓöÇΓû║ NO + leaves billing zone: BILLING_QUEUE_ABANDON emitted  VISITOR CROSSES THRESHOLD (outbound)   ΓööΓöÇΓû║ EXIT emitted. Embedding stored in exit pool (60-min TTL in Redis).
+
+=== TABLE 20 ===
+Stage | Action
+Client | POST /events/ingest with array of up to 500 events
+Middleware | trace_id generated, request logged with store_id, event_count
+Validation | Pydantic validates each event. Invalid events ΓåÆ rejected list (not 4xx)
+Dedup | Redis SETNX on event_id. Already seen ΓåÆ skipped (idempotent)
+Persist | Valid, new events batch-inserted to PostgreSQL events table
+Response | 200 {accepted: N, rejected: M, errors: [{event_id, reason}]}
+
+=== TABLE 21 ===
+Stage | Action
+Client | GET /stores/STORE_BLR_002/metrics
+Auth Check | API key header validated (x-api-key)
+Query | SQLAlchemy async query: events WHERE store_id=X AND timestamp > today 00:00 UTC
+Compute | unique visitors (distinct visitor_id, is_staff=false), conversion rate, avg dwell, queue depth
+Staff filter | All events where is_staff=true excluded from every metric
+Re-entry fix | REENTRY events: visitor counted once in unique visitors (de-duped by visitor_id)
+Response | 200 {unique_visitors, conversion_rate, avg_dwell_by_zone[], queue_depth, abandonment_rate}
+
+=== TABLE 22 ===
+Stage | Action
+Trigger | GET /stores/{id}/anomalies OR background task every 60s
+Queue Spike | current queue_depth > QUEUE_SPIKE_THRESHOLD ΓåÆ CRITICAL anomaly
+Conv. Drop | today conversion_rate < (7-day avg ├ù (1 - CONVERSION_DROP_THRESHOLD_PCT/100)) ΓåÆ WARN
+Dead Zone | no ZONE_ENTER events for any zone in last DEAD_ZONE_MIN minutes ΓåÆ INFO
+Response | {anomalies: [{type, severity, message, suggested_action, detected_at}]}
+
+=== TABLE 23 ===
+Route | Content
+/ | Store selector ΓÇö list of stores with status indicators (live / stale)
+/stores/:id | Store overview ΓÇö metrics card, funnel, heatmap, active anomalies
+/stores/:id/heatmap | Full-screen zone heatmap with dwell colour coding
+/stores/:id/funnel | Conversion funnel with drop-off percentages per stage
+/stores/:id/anomalies | Anomaly list with severity, suggested_action, timestamp
+/health | System health: all stores last event timestamp, STALE_FEED warnings
+
+=== TABLE 24 ===
+Edge Case | System Behaviour
+Empty store (0 visitors) | API returns metrics with all zeros, no null fields, no 5xx
+All-staff clip | is_staff=true on all events ΓåÆ conversion_rate=0, unique_visitors=0, no crash
+Zero purchases | POS table empty ΓåÆ conversion_rate=0.0, abandonment_rate computed correctly
+Re-entry in funnel | visitor_id counted once in unique visitors regardless of REENTRY event count
+Duplicate POST /ingest | Redis dedup by event_id ΓåÆ second call returns same accepted count, no double-persist
+DB unavailable | FastAPI dependency check fails ΓåÆ 503 {error: 'database_unavailable', retry_after: 30}
+Feed stale >10 min | /health shows STALE_FEED: true for that store_id
+Low confidence event | Emitted with confidence value intact, NOT suppressed or elevated
+Camera FOV overlap | Cross-cam dedup: Redis set of (visitor_id + store_id) with 5s TTL
+Group entry (3 people) | 3 separate track_ids ΓåÆ 3 separate visitor_ids ΓåÆ 3 ENTRY events
+
+=== TABLE 25 ===
+04 | UI/UX Design Brief ΓÇö Visual & Interaction Design Guide Every colour, font, and component decision ΓÇö so the dashboard looks production-grade, not prototype.
+
+=== TABLE 26 ===
+Dark mode, data-dense, precision tooling. Reference: Linear + Grafana. Retail analytics is a serious tool ΓÇö the UI should feel like a control room, not a consumer app. No gradients except for heatmap. No decorative elements. Every pixel earns its place by communicating data.
+
+=== TABLE 27 ===
+Token | Value & Usage
+Background (page) | #0F172A ΓÇö deep navy slate
+Background (card/panel) | #1E293B ΓÇö elevated panel
+Background (input) | #334155 ΓÇö form input
+Primary Brand | #A855F7 ΓÇö Purplle purple (primary actions, highlights)
+Primary Dark | #7C3AED ΓÇö button hover, active states
+Text Primary | #F1F5F9 ΓÇö all body text
+Text Secondary | #94A3B8 ΓÇö labels, captions, meta
+Text Muted | #64748B ΓÇö disabled states, placeholders
+Success (conversion) | #22C55E ΓÇö positive metrics
+Warning (queue) | #F59E0B ΓÇö queue depth, moderate anomalies
+Critical (anomaly) | #EF4444 ΓÇö CRITICAL severity, drop alerts
+Info (dead zone) | #3B82F6 ΓÇö INFO anomalies
+Border / Divider | #334155 ΓÇö card borders, table separators
+Heatmap 0% | #1E293B ΓÇö no traffic
+Heatmap 100% | #A855F7 ΓÇö peak traffic (purple ΓåÆ Purplle brand)
+
+=== TABLE 28 ===
+Element | Specification
+UI Font | Inter (Google Fonts CDN) ΓÇö entire UI, all sizes
+Mono Font | JetBrains Mono ΓÇö event_id, visitor_id, trace_id display, code blocks
+Page Title (H1) | Inter 28px / 700 weight / #F1F5F9
+Section Header (H2) | Inter 20px / 600 weight / #F1F5F9
+Card Metric Value | Inter 40px / 700 weight / #F1F5F9 (large KPI numbers)
+Card Metric Label | Inter 13px / 500 weight / #94A3B8 uppercase tracking-wide
+Body / Table | Inter 14px / 400 weight / #F1F5F9
+Caption / Meta | Inter 12px / 400 weight / #64748B
+Badge Text | Inter 11px / 600 weight / uppercase
+
+=== TABLE 29 ===
+Region | Spec
+Sidebar | 220px fixed left sidebar: store selector, nav links, health indicator
+Main Content | Fluid width, max-width 1400px, 24px padding
+Top Bar | Store name + live indicator dot + last updated timestamp
+Metrics Row | 4-column grid of metric cards (responsive: 2-col on tablet, 1-col mobile)
+Charts Row | Funnel (60%) + Anomalies panel (40%) side by side
+Full-width Row | Zone Heatmap spanning full content width
+
+=== TABLE 30 ===
+Primary: Grafana (data density, dark theme, live updates) ┬╖ Linear (typography, card design, precision) ┬╖ Vercel Analytics (clean metrics layout) ┬╖ Mixpanel (funnel visualisation style)
+
+=== TABLE 31 ===
+05 | Backend Schema ΓÇö Data Model & Auth Architecture Every table, column, index, and RLS rule ΓÇö defined before any migration is written.
+
+=== TABLE 32 ===
+CREATE TABLE events (   event_id        UUID            PRIMARY KEY,           -- from pipeline (globally unique)   store_id        VARCHAR(50)     NOT NULL,   camera_id       VARCHAR(50)     NOT NULL,   visitor_id      VARCHAR(50)     NOT NULL,   event_type      VARCHAR(30)     NOT NULL,              -- enum enforced in app layer   timestamp       TIMESTAMPTZ     NOT NULL,   zone_id         VARCHAR(50),                           -- NULL for ENTRY/EXIT   dwell_ms        INTEGER         NOT NULL DEFAULT 0,   is_staff        BOOLEAN         NOT NULL DEFAULT false,   confidence      FLOAT           NOT NULL,   queue_depth     INTEGER,                               -- from metadata   sku_zone        VARCHAR(100),                          -- from metadata   session_seq     INTEGER         NOT NULL,   raw_metadata    JSONB,                                 -- full metadata blob   ingested_at     TIMESTAMPTZ     NOT NULL DEFAULT now() );
+
+=== TABLE 33 ===
+CREATE TABLE sessions (   session_id      UUID            PRIMARY KEY DEFAULT gen_random_uuid(),   store_id        VARCHAR(50)     NOT NULL,   visitor_id      VARCHAR(50)     NOT NULL,   entry_ts        TIMESTAMPTZ     NOT NULL,   exit_ts         TIMESTAMPTZ,                           -- NULL if still in store   is_converted    BOOLEAN         NOT NULL DEFAULT false, -- POS correlated   is_reentry      BOOLEAN         NOT NULL DEFAULT false,   total_dwell_ms  INTEGER,   zones_visited   TEXT[],                                -- array of zone_ids   reached_billing BOOLEAN         NOT NULL DEFAULT false,   abandoned_queue BOOLEAN         NOT NULL DEFAULT false,   created_at      TIMESTAMPTZ     NOT NULL DEFAULT now() );
+
+=== TABLE 34 ===
+CREATE TABLE pos_transactions (   transaction_id  VARCHAR(50)     PRIMARY KEY,   store_id        VARCHAR(50)     NOT NULL,   timestamp       TIMESTAMPTZ     NOT NULL,   basket_value    NUMERIC(10,2)   NOT NULL,   imported_at     TIMESTAMPTZ     NOT NULL DEFAULT now() );
+
+=== TABLE 35 ===
+CREATE TABLE stores (   store_id        VARCHAR(50)     PRIMARY KEY,   name            VARCHAR(200)    NOT NULL,   city            VARCHAR(100)    NOT NULL,   layout          JSONB           NOT NULL,              -- store_layout.json content   open_hours      JSONB           NOT NULL,   cameras         JSONB           NOT NULL,              -- camera definitions   created_at      TIMESTAMPTZ     NOT NULL DEFAULT now() );
+
+=== TABLE 36 ===
+CREATE TABLE anomalies_log (   id              UUID            PRIMARY KEY DEFAULT gen_random_uuid(),   store_id        VARCHAR(50)     NOT NULL,   anomaly_type    VARCHAR(50)     NOT NULL,   severity        VARCHAR(10)     NOT NULL,              -- INFO / WARN / CRITICAL   message         TEXT            NOT NULL,   suggested_action TEXT           NOT NULL,   detected_at     TIMESTAMPTZ     NOT NULL DEFAULT now(),   resolved_at     TIMESTAMPTZ );
+
+=== TABLE 37 ===
+-- Event queries are almost always filtered by store + time CREATE INDEX idx_events_store_ts   ON events(store_id, timestamp DESC); CREATE INDEX idx_events_visitor    ON events(visitor_id); CREATE INDEX idx_events_type       ON events(event_type); CREATE INDEX idx_events_staff      ON events(is_staff) WHERE is_staff = false;  -- Session lookups by visitor (for re-entry dedup in funnel) CREATE INDEX idx_sessions_visitor  ON sessions(visitor_id, store_id); CREATE INDEX idx_sessions_store_ts ON sessions(store_id, entry_ts DESC);  -- POS correlation: time-range lookup per store CREATE INDEX idx_pos_store_ts      ON pos_transactions(store_id, timestamp DESC);
+
+=== TABLE 38 ===
+Key Pattern | Purpose & TTL
+dedup:{event_id} | SET ΓÇö idempotency check. TTL: 7 days. Prevents double-ingest.
+exit_pool:{store_id} | HASH ΓÇö visitor_id ΓåÆ embedding bytes. TTL: 60 min. For re-entry detection.
+cam_seen:{store_id}:{visitor_id} | SETEX with 5s TTL ΓÇö cross-camera deduplication.
+queue_depth:{store_id} | STRING ΓÇö current billing queue depth. Updated on BILLING_QUEUE_JOIN/ZONE_EXIT.
+metrics_cache:{store_id} | HASH ΓÇö cached /metrics response. TTL: 30s. Reduces DB load on frequent polls.
+stale_feed:{store_id} | STRING ΓÇö last event timestamp per store. Checked by /health.
+
+=== TABLE 39 ===
+Concern | Approach
+Auth Method | API Key (x-api-key header). No per-user auth ΓÇö internal tool.
+Key Storage | VALID_API_KEYS env var (comma-separated). Checked via FastAPI Security dependency.
+Sensitive Fields | No PII in DB. visitor_id is a non-reversible session token, not linked to identity.
+SQL Injection | All queries via SQLAlchemy ORM ΓÇö zero raw string interpolation.
+Error Exposure | Exception handlers catch all 5xx ΓÇö return structured body, never raw traceback.
+CORS | Restricted to CORS_ORIGINS env var. Dashboard origin whitelisted explicitly.
+
+=== TABLE 40 ===
+A visitor session is counted as 'converted' if: the session's visitor_id has a ZONE_ENTER event with zone_id matching the billing zone AND there exists a pos_transactions row for the same store_id with timestamp within +5 minutes of that ZONE_ENTER event. Correlation runs on session close (EXIT event received) or at end-of-day batch.
+
+=== TABLE 41 ===
+POST /events/ingest   Γö£ΓöÇ Pydantic validates each event   Γö£ΓöÇ Redis SETNX dedup:event_id ΓåÆ skip if exists   Γö£ΓöÇ Batch INSERT into events table (ON CONFLICT event_id DO NOTHING)   Γö£ΓöÇ Upsert sessions table (open/close session based on ENTRY/EXIT)   Γö£ΓöÇ Update queue_depth:{store_id} in Redis   Γö£ΓöÇ Update stale_feed:{store_id} = now()   ΓööΓöÇ Publish to WebSocket channel for live dashboard  GET /stores/{id}/metrics   Γö£ΓöÇ Check metrics_cache:{store_id} in Redis (30s TTL)   Γö£ΓöÇ MISS: SQLAlchemy async query ΓåÆ events + sessions   Γö£ΓöÇ Compute: unique_visitors, conversion_rate, avg_dwell, queue_depth, abandonment_rate   Γö£ΓöÇ Exclude is_staff=true events from ALL metrics   ΓööΓöÇ De-duplicate re-entries in unique visitor count
+
+=== TABLE 42 ===
+06 | Implementation Plan ΓÇö Step-by-Step Build Sequence The exact order to build so no foundation layer is skipped. Ship in 48 hours.
+
+=== TABLE 43 ===
+ΓÅ▒ 48-Hour Window. Parts A+B weighted most heavily (65 pts). Build in this exact sequence ΓÇö API must pass the acceptance gate or nothing is scored.
+
+=== TABLE 44 ===
+Task | Action
+1.1 Repo init | git init store-intelligence ┬╖ .gitignore (Python, Node, .env) ┬╖ README.md skeleton
+1.2 Docker Compose | docker-compose.yml: services api, db (postgres:16), redis:7, dashboard. Volumes for DB persistence.
+1.3 .env.example | All 15 environment variables listed. .env copied from example with real values.
+1.4 DB init script | init.sql creates all tables and indexes. Mounted as Docker volume entrypoint.
+1.5 FastAPI skeleton | main.py with health endpoint only. Confirms docker compose up works before any logic.
+
+=== TABLE 45 ===
+Γ£à Done when: docker compose up starts, GET /health returns 200, PostgreSQL and Redis reachable.
+
+=== TABLE 46 ===
+Task | Action
+2.1 Alembic init | alembic init migrations. Configure alembic.ini with DATABASE_URL.
+2.2 Initial migration | Create events, sessions, pos_transactions, stores, anomalies_log tables.
+2.3 Indexes | Add all performance indexes in second migration.
+2.4 Seed stores | Insert 5 store records from store_layout.json into stores table.
+2.5 Import POS | Script to import pos_transactions.csv into DB on startup.
+
+=== TABLE 47 ===
+Γ£à Done when: alembic upgrade head succeeds. All 5 tables exist. stores table has 5 rows.
+
+=== TABLE 48 ===
+Task | Action
+3.1 Pydantic models | models.py: StoreEvent, EventType enum, IngestRequest, IngestResponse, MetricsResponse, FunnelResponse, HeatmapResponse, AnomalyResponse, HealthResponse.
+3.2 POST /events/ingest | Validate batch, Redis dedup, batch INSERT, partial success response. Idempotent.
+3.3 Structured logging | structlog JSON middleware: trace_id, store_id, endpoint, latency_ms, event_count, status_code on every request.
+3.4 Error handlers | Global exception handler: all 5xx ΓåÆ {error, message, trace_id}. No raw tracebacks.
+3.5 Test ingest | test_ingestion.py: happy path, duplicate batch, malformed event, 500-event batch, empty store.
+
+=== TABLE 49 ===
+Γ£à Done when: POST /events/ingest accepts 200 events, returns partial success on 1 malformed. Duplicate POST returns same result (idempotent). Test coverage starts.
+
+=== TABLE 50 ===
+Task | Action
+4.1 /metrics | Unique visitors (excl. staff), conversion rate (POS correlated), avg dwell per zone, queue depth, abandonment rate. Zero-safe.
+4.2 /funnel | EntryΓåÆZoneΓåÆBillingΓåÆPurchase counts. Drop-off % per stage. Session as unit. Re-entry: visitor counted once.
+4.3 /heatmap | Zone visit freq + avg dwell. Normalise 0ΓÇô100 across zones. data_confidence flag if <20 sessions.
+4.4 /anomalies | Queue spike (queue_depth > threshold). Conversion drop (vs 7-day avg). Dead zone (no visits in 30 min). Severity + suggested_action string.
+4.5 /health | Per-store last_event_ts, lag_minutes, STALE_FEED flag. Service DB + Redis status.
+4.6 Session logic | sessions table upsert on ENTRY/EXIT events. POS correlation on EXIT.
+4.7 API tests | test_metrics.py, test_funnel.py, test_anomalies.py with PROMPT blocks. Edge cases: empty store, all-staff, zero purchases.
+
+=== TABLE 51 ===
+Γ£à Done when: All 6 endpoints return correct JSON on sample_events.jsonl data. All 10 assertions.py pass. Edge cases handled without null or 5xx.
+
+=== TABLE 52 ===
+Task | Action
+5.1 Environment | pipeline/requirements.txt: ultralytics, bytex, torchreid, opencv-python, structlog. Dockerfile for pipeline service.
+5.2 detect.py | YOLOv8x load. Frame loop per clip. Class 0 filter. Confidence ΓëÑ0.45. Bbox per frame.
+5.3 tracker.py | ByteTrack integration. track_id ΓåÆ visitor_id mapping. OSNet embedding extraction per tracklet.
+5.4 Re-ID / REENTRY | Exit pool in Redis. Cosine similarity check on new ENTRY. REENTRY event if match.
+5.5 staff.py | HSV clothing region check for staff uniform colour range. is_staff flag.
+5.6 zones.py | Load zone polygons from store_layout.json. Point-in-polygon for bbox centroid.
+5.7 emit.py | State machine: event type logic. Pydantic validation. JSONL write.
+5.8 POS correlation | Post-processing: match EXIT timestamps against POS records. is_converted flag.
+5.9 run.sh | One command processes all clips ΓåÆ events.jsonl. Feeds into POST /events/ingest.
+5.10 Pipeline tests | test_pipeline.py with PROMPT block. Edge cases: group entry, occlusion, empty period.
+
+=== TABLE 53 ===
+Γ£à Done when: run.sh processes all 5 stores ├ù 3 cameras. events.jsonl validates against schema. All 8 event types present in output. REENTRY events detected on re-entry test clip.
+
+=== TABLE 54 ===
+Task | Action
+6.1 Test coverage | Run pytest --cov. Reach >70% statement coverage. Add missing tests.
+6.2 Graceful degradation | Test DB down ΓåÆ 503 structured. Redis down ΓåÆ degrade to in-memory dedup with warning log.
+6.3 DESIGN.md | >250 words. Architecture overview. 'AI-Assisted Decisions' section with 2ΓÇô3 concrete examples.
+6.4 CHOICES.md | >250 words. 3 decisions: detection model, event schema, API architecture. Options + AI suggestion + final choice.
+6.5 PROMPT blocks | Add # PROMPT: / # CHANGES MADE: comment block to top of every test file.
+6.6 README.md | Setup in 5 commands. How to run detection pipeline. API endpoints reference. Docker ports.
+6.7 Clean run test | git clone to fresh directory. docker compose up. Run assertions.py. All pass.
+
+=== TABLE 55 ===
+Γ£à Done when: docker compose up on clean machine passes acceptance gate. Coverage >70%. DESIGN.md and CHOICES.md both >250 words and non-generic.
+
+=== TABLE 56 ===
+Task | Action
+7.1 WebSocket endpoint | FastAPI WebSocket at /ws/stores/{id}. Broadcasts new events on ingest.
+7.2 React scaffold | Vite + React 18 + Tailwind. dashboard/ Dockerfile. Nginx serve in production.
+7.3 Metrics cards | 4 KPI cards: unique visitors, conversion rate, avg dwell, queue depth. Live updates.
+7.4 Funnel chart | Recharts BarChart. Stages: Entry ΓåÆ Zone ΓåÆ Billing ΓåÆ Purchase + drop-off %.
+7.5 Zone heatmap | SVG grid of zones. Colour scale 0ΓÇô100. Tooltip on hover.
+7.6 Anomaly panel | Real-time anomaly cards with severity colour coding. Auto-inserts on WebSocket message.
+7.7 Health page | Store status table. STALE_FEED highlighted amber. Auto-refresh 30s.
+7.8 Live demo mode | run.sh feeds events in simulated real time (--replay-speed 10x flag). Dashboard updates live.
+
+=== TABLE 57 ===
+Γ£à Done when: Detection pipeline feeds events in real time. Dashboard shows metrics updating live. At least one metric visibly updates as events flow. URL noted in README.
+
+=== TABLE 58 ===
+Task | Action
+8.1 Final clean run | git clone fresh. docker compose up. Run assertions.py. Run pytest. All pass.
+8.2 Submission checklist | Git repo link (private). DESIGN.md Γ£ô. CHOICES.md Γ£ô. PROMPT blocks in tests Γ£ô. README Γ£ô. Dashboard URL if built Γ£ô.
+8.3 Video prep | Know your code deeply: detection model trade-offs, visitor_id edge cases, funnel dedup logic, VLM vs rule-based decision.
+8.4 Submit | Share repo with reviewer handle. Send submission email before 48-hour window closes.
+

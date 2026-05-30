@@ -1,0 +1,136 @@
+﻿Store Intelligence Platform
+1.1 Problem Statement
+Apex Retail operates 40 physical stores across 8 cities. Their online channel tracks every session, click, and drop-off in real time. Their offline stores are a complete data blind spot. Store managers have no reliable data on:
+How many unique customers enter each day and how many make a purchase
+Which product zones attract attention but fail to convert
+How deep billing queues get and how many customers abandon before purchase
+Whether their conversion rate today is better or worse than last week
+This creates a $X revenue opportunity gap: decisions about store layout, staffing, and promotions are made on gut feel rather than data.
+1.2 Target User Personas
+1.3 Core Features ΓÇö Must Have (Hackathon Scope)
+Part A ΓÇö Detection Pipeline
+Person detection from CCTV footage using YOLOv8 + ByteTrack
+Handle groups entering simultaneously ΓÇö count individuals, not groups
+Staff detection and exclusion from customer metrics (uniform-based or VLM)
+Re-entry detection ΓÇö same physical person returning after EXIT must produce REENTRY event
+Partial occlusion handling ΓÇö degrade gracefully, emit with low confidence, never drop
+Structured event emission matching exact schema
+8 event types: ENTRY, EXIT, ZONE_ENTER, ZONE_EXIT, ZONE_DWELL, BILLING_QUEUE_JOIN, BILLING_QUEUE_ABANDON, REENTRY
+Per-session visitor_id token via Re-ID (bounding box trajectory + OSNet/torchreid)
+ISO-8601 UTC timestamps derived from clip start + frame offset
+Cross-camera deduplication ΓÇö same person across overlapping camera FOVs counted once
+POS transaction correlation ΓÇö billing zone presence in 5-min window before transaction = conversion
+Part B ΓÇö Intelligence API (FastAPI)
+POST /events/ingest ΓÇö batch ingest up to 500 events, idempotent by event_id
+GET /stores/{id}/metrics ΓÇö unique visitors, conversion rate, avg dwell per zone, queue depth, abandonment rate
+GET /stores/{id}/funnel ΓÇö Entry ΓåÆ Zone Visit ΓåÆ Billing Queue ΓåÆ Purchase with drop-off %
+GET /stores/{id}/heatmap ΓÇö zone visit frequency + avg dwell, normalised 0ΓÇô100
+GET /stores/{id}/anomalies ΓÇö queue spike, conversion drop, dead zone alerts with severity + suggested_action
+GET /health ΓÇö service status, last event per store, STALE_FEED if >10 min lag
+Part C ΓÇö Production Readiness
+docker compose up ΓÇö zero manual steps beyond git clone
+Structured JSON logging: trace_id, store_id, endpoint, latency_ms, event_count, status_code
+Graceful degradation: DB unavailable ΓåÆ HTTP 503 structured body, no raw stack traces
+Test coverage >70%, edge cases: empty store, all-staff clip, zero purchases, re-entry in funnel
+README: setup in 5 commands including running the detection pipeline
+Part D ΓÇö AI Engineering Documentation
+Prompt blocks at top of each test file: # PROMPT: ... / # CHANGES MADE: ...
+DESIGN.md: architecture overview + 'AI-Assisted Decisions' section (2ΓÇô3 concrete examples)
+CHOICES.md: 3 decisions with options considered, AI suggestion, final choice + rationale
+Part E ΓÇö Live Dashboard (Bonus)
+Real-time or simulated real-time metric updates as events flow from detection layer
+Web UI preferred over terminal dashboard for maximum bonus points
+1.4 Nice to Have (Post-Hackathon)
+Multi-store comparative dashboard
+Historical trend charts (7-day, 30-day)
+Mobile app for store managers
+Webhook notifications for anomaly alerts
+Camera health monitoring and feed quality scoring
+1.5 Out of Scope
+1.6 User Stories
+1.7 Success Metrics
+2.1 Stack Overview
+2.2 Detection Pipeline ΓÇö Library Decisions
+2.3 Event Schema ΓÇö Locked Definition
+2.4 API Endpoints ΓÇö Locked Contracts
+2.5 Folder Structure
+2.6 Environment Variables
+2.7 Hard Constraints
+MUST run via docker compose up ΓÇö zero manual steps beyond git clone
+MUST pass all 10 assertions in assertions.py
+MUST handle zero-traffic stores without null responses or 5xx
+MUST NOT return raw stack traces in HTTP responses
+MUST be idempotent on POST /events/ingest ΓÇö safe to call twice with same payload
+MUST produce structured JSON logs on every request
+Statement test coverage MUST exceed 70%
+3.1 System-Level Data Flow
+3.2 Detection Pipeline Flow
+3.3 Event State Machine Per Visitor
+3.4 API Request Flow ΓÇö Key Journeys
+Journey 1 ΓÇö Ingest Event Batch
+Journey 2 ΓÇö Dashboard Loads /metrics
+Journey 3 ΓÇö Anomaly Detection (periodic + on-demand)
+3.5 Dashboard Screens & Navigation
+3.6 Edge Cases & Handling
+4.1 Aesthetic Direction
+4.2 Colour Palette
+4.3 Typography
+4.4 Component Design
+Metrics Card
+Dark panel (#1E293B), 8px border-radius, 1px border (#334155)
+Large KPI number (40px bold) + label below (13px uppercase muted)
+Trend indicator: Γåæ green / Γåô red with percentage delta
+Live pulse animation (2s) on metrics updating via WebSocket
+Conversion Funnel
+Horizontal bar chart using Recharts BarChart
+Each stage: label + count + drop-off % badge
+Purple bars ΓåÆ fade to muted at low-traffic stages
+No legends ΓÇö labels directly on bars
+Zone Heatmap
+Grid of zone rectangles proportional to store_layout.json zone sizes
+Colour: #1E293B (0%) ΓåÆ #7C3AED (50%) ΓåÆ #A855F7 (100%)
+Tooltip on hover: zone name, visit count, avg dwell time
+data_confidence flag renders as 'ΓÜá Low data' overlay on affected zones
+Anomaly Alert Cards
+Left accent border 4px: red (CRITICAL) / amber (WARN) / blue (INFO)
+Icon + severity badge + anomaly type + message + suggested_action (italic)
+Dismissed via X button (client-side only, no backend state)
+Health Panel
+Table: store_id | last_event | lag | status badge
+STALE_FEED badge: solid amber background, bold text
+Auto-refreshes every 30s via polling
+4.5 Layout
+4.6 Real-Time Behaviour (Part E)
+WebSocket connection to ws://localhost:8000/ws/stores/{id}
+On new event received: metrics card values animate (count-up 300ms ease-in-out)
+Live indicator dot pulses green when WebSocket connected, red when disconnected
+Last updated timestamp updates on every WebSocket message
+Anomaly panel auto-inserts new anomaly cards without page refresh
+4.7 Mobile Responsiveness
+Breakpoints: mobile <768px, tablet 768ΓÇô1024px, desktop >1024px
+Sidebar collapses to bottom tab bar on mobile
+Metric cards stack to 2-column on tablet, 1-column on mobile
+Heatmap scrollable horizontally on small screens
+Minimum font size 14px ΓÇö no text below this threshold
+4.8 Reference Apps
+5.1 Database: PostgreSQL 16
+Table: events
+Table: sessions (materialised view ΓÇö computed on ingest)
+Table: pos_transactions
+Table: stores
+Table: anomalies_log (audit trail)
+5.2 Indexes (Performance-Critical Columns)
+5.3 Redis Schema
+5.4 Auth & Security
+5.5 POS Correlation Logic
+5.6 Data Flow ΓÇö Ingest to Query
+Phase 1 ΓÇö Project Setup [Hour 0ΓÇô2]
+Phase 2 ΓÇö Database Migrations [Hour 2ΓÇô3]
+Phase 3 ΓÇö Event Schema & Ingestion API [Hour 3ΓÇô6]
+Phase 4 ΓÇö Core API Endpoints [Hour 6ΓÇô16]
+Phase 5 ΓÇö Detection Pipeline [Hour 16ΓÇô28]
+Phase 6 ΓÇö Production Readiness [Hour 28ΓÇô34]
+Phase 7 ΓÇö Live Dashboard ΓÇö Part E Bonus [Hour 34ΓÇô44]
+Phase 8 ΓÇö Final Submission [Hour 44ΓÇô48]
+North Star: Every build decision should make the Offline Conversion Rate more accurate or more actionable.
+Ship something you are proud of.
