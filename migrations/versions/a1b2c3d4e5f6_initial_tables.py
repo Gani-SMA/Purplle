@@ -31,7 +31,7 @@ def upgrade() -> None:
             sa.Column('layout', sa.JSON(), nullable=False),
             sa.Column('open_hours', sa.JSON(), nullable=False),
             sa.Column('cameras', sa.JSON(), nullable=False),
-            sa.Column('created_at', sa.TIMESTAMPTZ(), server_default=sa.text('now()'), nullable=False),
+            sa.Column('created_at', sa.TIMESTAMP(timezone=True), server_default=sa.text('now()'), nullable=False),
             sa.PrimaryKeyConstraint('store_id')
         )
 
@@ -44,7 +44,7 @@ def upgrade() -> None:
             sa.Column('camera_id', sa.String(length=50), nullable=False),
             sa.Column('visitor_id', sa.String(length=50), nullable=False),
             sa.Column('event_type', sa.String(length=30), nullable=False),
-            sa.Column('timestamp', sa.TIMESTAMPTZ(), nullable=False),
+            sa.Column('timestamp', sa.TIMESTAMP(timezone=True), nullable=False),
             sa.Column('zone_id', sa.String(length=50), nullable=True),
             sa.Column('dwell_ms', sa.Integer(), server_default='0', nullable=False),
             sa.Column('is_staff', sa.Boolean(), server_default='false', nullable=False),
@@ -53,7 +53,7 @@ def upgrade() -> None:
             sa.Column('sku_zone', sa.String(length=100), nullable=True),
             sa.Column('session_seq', sa.Integer(), nullable=False),
             sa.Column('raw_metadata', sa.JSON(), nullable=True),
-            sa.Column('ingested_at', sa.TIMESTAMPTZ(), server_default=sa.text('now()'), nullable=False),
+            sa.Column('ingested_at', sa.TIMESTAMP(timezone=True), server_default=sa.text('now()'), nullable=False),
             sa.ForeignKeyConstraint(['store_id'], ['stores.store_id'], ondelete='CASCADE'),
             sa.PrimaryKeyConstraint('event_id')
         )
@@ -65,15 +65,15 @@ def upgrade() -> None:
             sa.Column('session_id', sa.UUID(), server_default=sa.text('gen_random_uuid()'), nullable=False),
             sa.Column('store_id', sa.String(length=50), nullable=False),
             sa.Column('visitor_id', sa.String(length=50), nullable=False),
-            sa.Column('entry_ts', sa.TIMESTAMPTZ(), nullable=False),
-            sa.Column('exit_ts', sa.TIMESTAMPTZ(), nullable=True),
+            sa.Column('entry_ts', sa.TIMESTAMP(timezone=True), nullable=False),
+            sa.Column('exit_ts', sa.TIMESTAMP(timezone=True), nullable=True),
             sa.Column('is_converted', sa.Boolean(), server_default='false', nullable=False),
             sa.Column('is_reentry', sa.Boolean(), server_default='false', nullable=False),
             sa.Column('total_dwell_ms', sa.Integer(), nullable=True),
             sa.Column('zones_visited', sa.ARRAY(sa.Text()), nullable=True),
             sa.Column('reached_billing', sa.Boolean(), server_default='false', nullable=False),
             sa.Column('abandoned_queue', sa.Boolean(), server_default='false', nullable=False),
-            sa.Column('created_at', sa.TIMESTAMPTZ(), server_default=sa.text('now()'), nullable=False),
+            sa.Column('created_at', sa.TIMESTAMP(timezone=True), server_default=sa.text('now()'), nullable=False),
             sa.ForeignKeyConstraint(['store_id'], ['stores.store_id'], ondelete='CASCADE'),
             sa.PrimaryKeyConstraint('session_id')
         )
@@ -84,9 +84,9 @@ def upgrade() -> None:
             'pos_transactions',
             sa.Column('transaction_id', sa.String(length=50), nullable=False),
             sa.Column('store_id', sa.String(length=50), nullable=False),
-            sa.Column('timestamp', sa.TIMESTAMPTZ(), nullable=False),
+            sa.Column('timestamp', sa.TIMESTAMP(timezone=True), nullable=False),
             sa.Column('basket_value', sa.Numeric(precision=10, scale=2), nullable=False),
-            sa.Column('imported_at', sa.TIMESTAMPTZ(), server_default=sa.text('now()'), nullable=False),
+            sa.Column('imported_at', sa.TIMESTAMP(timezone=True), server_default=sa.text('now()'), nullable=False),
             sa.ForeignKeyConstraint(['store_id'], ['stores.store_id'], ondelete='CASCADE'),
             sa.PrimaryKeyConstraint('transaction_id')
         )
@@ -101,8 +101,8 @@ def upgrade() -> None:
             sa.Column('severity', sa.String(length=10), nullable=False),
             sa.Column('message', sa.Text(), nullable=False),
             sa.Column('suggested_action', sa.Text(), nullable=False),
-            sa.Column('detected_at', sa.TIMESTAMPTZ(), server_default=sa.text('now()'), nullable=False),
-            sa.Column('resolved_at', sa.TIMESTAMPTZ(), nullable=True),
+            sa.Column('detected_at', sa.TIMESTAMP(timezone=True), server_default=sa.text('now()'), nullable=False),
+            sa.Column('resolved_at', sa.TIMESTAMP(timezone=True), nullable=True),
             sa.ForeignKeyConstraint(['store_id'], ['stores.store_id'], ondelete='CASCADE'),
             sa.PrimaryKeyConstraint('id')
         )
