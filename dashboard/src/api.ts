@@ -2,8 +2,11 @@
 
 export function getApiBaseUrl(): string {
   const storedUrl = localStorage.getItem('purplle_api_url');
-  if (storedUrl) return storedUrl;
-  return import.meta.env.VITE_API_URL || '/api';
+  let url = storedUrl || import.meta.env.VITE_API_URL || '/api';
+  if (url.endsWith('/')) {
+    url = url.slice(0, -1);
+  }
+  return url;
 }
 
 export function setApiBaseUrl(url: string) {

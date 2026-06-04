@@ -69,7 +69,8 @@ export default function App() {
       const d = await api.getHealth();
       setHealth(d);
       setApiHealthStatus(d.status === 'healthy' ? 'healthy' : 'stale');
-    } catch {
+    } catch (err) {
+      console.error("fetchHealth failed:", err);
       setApiHealthStatus('offline');
     } finally {
       setHealthLoading(false);
