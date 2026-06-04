@@ -278,18 +278,38 @@ export function Sidebar({ currentStoreId, onStoreChange, apiHealth, onRefreshHea
                 }}
               />
             </div>
-            <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
-              <button type="button" onClick={() => setShowSettings(false)} style={{
-                fontSize: 11, color: 'var(--text-3)',
-                background: 'none', border: 'none', cursor: 'pointer',
-              }}>Cancel</button>
-              <button type="submit" style={{
-                padding: '4px 12px', borderRadius: 6,
-                fontSize: 11, fontWeight: 600,
-                background: 'linear-gradient(135deg, #6366f1, #818cf8)',
-                color: '#fff', border: 'none', cursor: 'pointer',
-                boxShadow: '0 2px 8px rgba(99,102,241,0.35)',
-              }}>Save</button>
+            <div style={{ display: 'flex', gap: 6, justifyContent: 'space-between', width: '100%', alignItems: 'center' }}>
+              <button
+                type="button"
+                onClick={() => {
+                  setApiBaseUrl('');
+                  setApiKey('test_key_1');
+                  window.location.reload();
+                }}
+                style={{
+                  fontSize: 10.5, color: '#f87171',
+                  background: 'none', border: 'none', cursor: 'pointer',
+                  fontWeight: 600, padding: 0,
+                  transition: 'opacity 0.15s',
+                }}
+                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.opacity = '0.8'; }}
+                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.opacity = '1'; }}
+              >
+                Reset Default
+              </button>
+              <div style={{ display: 'flex', gap: 6 }}>
+                <button type="button" onClick={() => setShowSettings(false)} style={{
+                  fontSize: 11, color: 'var(--text-3)',
+                  background: 'none', border: 'none', cursor: 'pointer',
+                }}>Cancel</button>
+                <button type="submit" style={{
+                  padding: '4px 12px', borderRadius: 6,
+                  fontSize: 11, fontWeight: 600,
+                  background: 'linear-gradient(135deg, #6366f1, #818cf8)',
+                  color: '#fff', border: 'none', cursor: 'pointer',
+                  boxShadow: '0 2px 8px rgba(99,102,241,0.35)',
+                }}>Save</button>
+              </div>
             </div>
           </form>
         )}
