@@ -37,7 +37,7 @@ services:
     rootDir: dashboard
     buildCommand: npm install && npm run build
     staticPublishPath: dist
-    plan: free
+    plan: starter
     routes:
       - type: rewrite
         source: /*
