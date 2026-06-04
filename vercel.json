@@ -1,0 +1,20 @@
+{
+  "cleanUrls": true,
+  "trailingSlash": false,
+  "buildCommand": "npm install --prefix dashboard && npm run build --prefix dashboard",
+  "outputDirectory": "dashboard/dist",
+  "rewrites": [
+    {
+      "source": "/api/:path*",
+      "destination": "https://store-intelligence-api-sydb.onrender.com/:path*"
+    },
+    {
+      "source": "/ws/:path*",
+      "destination": "https://store-intelligence-api-sydb.onrender.com/ws/:path*"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
+}
