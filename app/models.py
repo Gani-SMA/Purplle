@@ -179,3 +179,97 @@ class StoreHealthItem(BaseModel):
 class HealthResponse(BaseModel):
     status:  str           # "healthy" | "stale"
     stores:  list[StoreHealthItem]
+
+
+# ---------------------------------------------------------------------------
+# POS Ingest
+# ---------------------------------------------------------------------------
+
+class PosTransaction(BaseModel):
+    transaction_id:   str
+    store_id:         str
+    timestamp:        datetime
+    basket_value_inr: float
+
+
+class PosIngestRequest(BaseModel):
+    transactions: list[PosTransaction] = Field(..., max_length=1000)
+
+
+class PosIngestResponse(BaseModel):
+    accepted: int
+    rejected: int
+    errors:   list[str] = []
+
+
+# ---------------------------------------------------------------------------
+# GET /stores/{id}/events/recent
+# ---------------------------------------------------------------------------
+
+class RecentEventItem(BaseModel):
+    event_id:   str
+    event_type: str
+    visitor_id: str
+    camera_id:  str
+    zone_id:    str | None
+    timestamp:  datetime
+    is_staff:   bool
+    confidence: float
+    dwell_ms:   int
+
+
+class RecentEventsResponse(BaseModel):
+    store_id: str
+    events:   list[RecentEventItem]
+    total:    int
+
+
+# ---------------------------------------------------------------------------
+# GET /stores/{id}/cameras
+# ---------------------------------------------------------------------------
+
+class CameraStatusItem(BaseModel):
+    camera_id:        str
+    last_seen_ts:     str | None
+    event_count_today: int
+    lag_seconds:      float | None
+    status:           str   # "live" | "stale" | "unknown"
+
+
+class CameraStatusResponse(BaseModel):
+    store_id: str
+    cameras:  list[CameraStatusItem]
+
+
+# ---------------------------------------------------------------------------
+# GET /stores/{id}/visitors/{visitor_id}/journey  (option B)
+# ---------------------------------------------------------------------------
+
+class VisitorJourneyEvent(BaseModel):
+    event_type: str
+    zone_id:    str | None
+    timestamp:  datetime
+    dwell_ms:   int
+    camera_id:  str
+
+
+class VisitorJourneyResponse(BaseModel):
+    store_id:   str
+    visitor_id: str
+    is_staff:   bool
+    events:     list[VisitorJourneyEvent]
+    total_dwell_ms: int
+    zones_visited:  list[str]
+
+
+# ---------------------------------------------------------------------------
+# GET /stores/{id}/pos/summary  (option C)
+# ---------------------------------------------------------------------------
+
+class PosSummaryResponse(BaseModel):
+    store_id:             str
+    total_transactions:   int
+    total_revenue_inr:    float
+    avg_basket_inr:       float
+    revenue_per_visitor:  float
+    hourly_revenue:       list[dict]   # [{hour: int, revenue: float, transactions: int}]

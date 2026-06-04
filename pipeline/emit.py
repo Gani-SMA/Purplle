@@ -52,8 +52,32 @@ class VisitorStateMachine:
             with open(self.output_path, "a") as f:
                 f.write(json.dumps(event_dict) + "\n")
             logger.info("event_emitted", event_type=event_dict["event_type"], visitor_id=event_dict["visitor_id"])
+            return event_dict  # return for Redis update
         except Exception as e:
-            logger.error("event_validation_failed", error=str(e), event=event_dict)
+            logger.error("event_validation_failed", error=str(e), event_data=event_dict)
+            return None
+
+    async def _update_cam_status(self, redis, timestamp: datetime):
+        """Persist per-camera live status to Redis so the dashboard can read it."""
+        try:
+            key = f"cam_status:{self.store_id}:{self.camera_id}"
+            raw = await redis.get(key)
+            count_today = 0
+            if raw:
+                try:
+                    existing = json.loads(raw)
+                    count_today = int(existing.get("count_today", 0))
+                except Exception:
+                    pass
+            count_today += 1
+            payload = json.dumps({
+                "last_seen": timestamp.isoformat(),
+                "count_today": count_today,
+            })
+            # TTL of 25 hours so it auto-expires overnight
+            await redis.set(key, payload, ex=90000)
+        except Exception as e:
+            logger.error("cam_status_update_failed", error=str(e))
 
     async def handle_detection(self, track_id, visitor_id, is_staff, confidence, zone_id, timestamp, redis, embedding=None):
         """
@@ -62,6 +86,9 @@ class VisitorStateMachine:
         """
         now_ts = timestamp
         
+        # Update per-camera live status in Redis on every detection
+        await self._update_cam_status(redis, now_ts)
+
         # Check if visitor is already active
         if visitor_id not in self.active_visitors:
             # ── Cross-camera deduplication ───────────────────────────────────

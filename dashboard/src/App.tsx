@@ -5,7 +5,11 @@ import { FunnelChart } from './components/FunnelChart';
 import { ZoneHeatmap } from './components/ZoneHeatmap';
 import { AnomalyPanel } from './components/AnomalyPanel';
 import { HealthTable } from './components/HealthTable';
+import { LiveEventsFeed } from './components/LiveEventsFeed';
+import { CameraStatusGrid } from './components/CameraStatusGrid';
+import { PosInsightsPanel } from './components/PosInsightsPanel';
 import { useMetrics } from './hooks/useMetrics';
+import { useLiveFeed } from './hooks/useLiveFeed';
 import { api, HealthResponse } from './api';
 import { Users, Clock, TrendingUp, ShoppingBag, RefreshCw, Wifi, WifiOff, Sun, Moon } from 'lucide-react';
 import { SpiralAnimation } from './components/ui/spiral-animation';
@@ -44,16 +48,20 @@ const STORE_META: Record<string, { name: string; city: string; accent: string; a
 
 export default function App() {
   const [currentStoreId, setCurrentStoreId] = useState('STR001');
-  const [health, setHealth]           = useState<HealthResponse | null>(null);
-  const [healthLoading, setHealthLoading] = useState(true);
+  const [health, setHealth]                 = useState<HealthResponse | null>(null);
+  const [healthLoading, setHealthLoading]   = useState(true);
   const [apiHealthStatus, setApiHealthStatus] = useState<'healthy' | 'stale' | 'offline'>('healthy');
 
   const { theme, toggle: toggleTheme } = useTheme();
 
   const {
     metrics, funnel, heatmap, anomalies,
-    loading, error, isConnected, lastUpdated, pulseMetrics, refetch,
+    loading, error, isConnected, wsEventCount, lastUpdated, pulseMetrics, refetch,
   } = useMetrics(currentStoreId);
+
+  // ── Pipeline-integrated live feed (options A + B + C) ──────────────────────
+  const { recentEvents, cameraStatus, posSummary, newEventIds, feedLoading, isOffline } =
+    useLiveFeed(currentStoreId, wsEventCount);
 
   const fetchHealth = async () => {
     try {
@@ -278,9 +286,62 @@ export default function App() {
             <ZoneHeatmap data={heatmap} />
           </div>
 
-          {/* ── Bottom row ── */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 14 }}>
+          {/* ── POS Revenue (option C) ── */}
+          <PosInsightsPanel data={posSummary} accentColor={accents[1]} />
+
+          {/* ── Pipeline section label ── */}
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 10,
+          }}>
+            <div style={{ height: 1, flex: 1, background: 'rgba(255,255,255,0.06)' }} />
+            <span style={{
+              fontSize: 9.5, fontWeight: 700, letterSpacing: '0.10em',
+              textTransform: 'uppercase', color: 'rgba(148,148,180,0.45)',
+              padding: '0 4px',
+            }}>
+              CCTV Pipeline
+            </span>
+            <div style={{ height: 1, flex: 1, background: 'rgba(255,255,255,0.06)' }} />
+          </div>
+
+          {/* Offline banner for pipeline section */}
+          {isOffline && (
+            <div style={{
+              padding: '10px 16px', borderRadius: 10,
+              background: 'rgba(251,191,36,0.08)',
+              border: '1px solid rgba(251,191,36,0.22)',
+              color: '#fbbf24', fontSize: 12,
+              display: 'flex', alignItems: 'center', gap: 10,
+            }}>
+              <span style={{ fontSize: 16 }}>⚠️</span>
+              <span>
+                <strong>Backend offline</strong> — Start Docker Desktop and run{' '}
+                <code style={{ fontFamily: 'monospace', background: 'rgba(0,0,0,0.25)', padding: '1px 6px', borderRadius: 4 }}>
+                  docker compose up -d
+                </code>
+                {' '}to populate pipeline data.
+              </span>
+            </div>
+          )}
+
+          {/* ── Camera Status Grid (option A) ── */}
+          <CameraStatusGrid cameras={cameraStatus} />
+
+          {/* ── Live Feed + Anomalies row ── */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, minHeight: 380 }}>
+            {/* Live Events Feed (option A + B) */}
+            <LiveEventsFeed
+              storeId={currentStoreId}
+              events={recentEvents}
+              newEventIds={newEventIds}
+              isOffline={isOffline}
+            />
+            {/* Anomalies */}
             <AnomalyPanel data={anomalies} />
+          </div>
+
+          {/* ── Bottom row ── */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 14 }}>
             <HealthTable health={health} loading={healthLoading} />
           </div>
         </div>

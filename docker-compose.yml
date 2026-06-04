@@ -36,8 +36,8 @@ services:
 
   api:
     build:
-      context: ./app
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: app/Dockerfile
     container_name: store_intelligence_api
     restart: always
     ports:
@@ -65,6 +65,7 @@ services:
     container_name: store_intelligence_dashboard
     restart: always
     ports:
+      - "80:80"
       - "5173:80"
     depends_on:
       - api

@@ -110,6 +110,9 @@ async def test_compute_anomalies_mock():
 
     mock_db = AsyncMock()
     
+    mock_ts_res = MagicMock()
+    mock_ts_res.scalar.return_value = datetime.now(timezone.utc)
+    
     mock_today_res = MagicMock()
     mock_today_res.fetchone.return_value = (1, 10)
     
@@ -123,6 +126,7 @@ async def test_compute_anomalies_mock():
     mock_has_act_res.scalar.return_value = 5
     
     mock_db.execute.side_effect = [
+        mock_ts_res,
         mock_today_res,
         mock_week_res,
         mock_dz_res,
@@ -143,6 +147,9 @@ async def test_compute_metrics_mock():
     
     mock_db = AsyncMock()
     
+    mock_ts_res = MagicMock()
+    mock_ts_res.scalar.return_value = datetime.now(timezone.utc)
+    
     mock_uv = MagicMock()
     mock_uv.scalar.return_value = 15
     
@@ -156,6 +163,7 @@ async def test_compute_metrics_mock():
     mock_aband.fetchone.return_value = (2, 8)
     
     mock_db.execute.side_effect = [
+        mock_ts_res,
         mock_uv,
         mock_conv,
         mock_dwell,
@@ -173,6 +181,9 @@ async def test_compute_metrics_mock():
 async def test_compute_funnel_mock():
     mock_db = AsyncMock()
     
+    mock_ts_res = MagicMock()
+    mock_ts_res.scalar.return_value = datetime.now(timezone.utc)
+    
     m1 = MagicMock()
     m1.scalar.return_value = 100
     m2 = MagicMock()
@@ -182,7 +193,7 @@ async def test_compute_funnel_mock():
     m4 = MagicMock()
     m4.scalar.return_value = 10
     
-    mock_db.execute.side_effect = [m1, m2, m3, m4]
+    mock_db.execute.side_effect = [mock_ts_res, m1, m2, m3, m4]
     
     res = await compute_funnel("STR001", mock_db)
     assert len(res.stages) == 4
@@ -198,13 +209,16 @@ async def test_compute_funnel_mock():
 async def test_compute_heatmap_mock():
     mock_db = AsyncMock()
     
+    mock_ts_res = MagicMock()
+    mock_ts_res.scalar.return_value = datetime.now(timezone.utc)
+    
     r1 = MagicMock()
     r1.fetchall.return_value = [("ZONE_A", 50, 15000.0), ("ZONE_B", 25, 45000.0)]
     
     r2 = MagicMock()
     r2.scalar.return_value = 25 # total_sessions >= 20 -> confidence=True
     
-    mock_db.execute.side_effect = [r1, r2]
+    mock_db.execute.side_effect = [mock_ts_res, r1, r2]
     
     res = await compute_heatmap("STR001", mock_db)
     assert len(res.zones) == 2

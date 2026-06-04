@@ -241,6 +241,10 @@ async def main() -> None:
     print("\n🌱 Purplle Store Intelligence — Seed Script (Phase 2)\n")
     conn = await asyncpg.connect(DATABASE_URL)
     try:
+        store_count = await conn.fetchval("SELECT COUNT(*) FROM stores")
+        if store_count > 0:
+            print("     ℹ Stores already exist. Skipping historical seed.")
+            return
         await seed_stores(conn)
         await seed_pos(conn)
         await seed_sessions(conn)

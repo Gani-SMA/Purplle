@@ -64,7 +64,7 @@ class ReIDExtractor:
         if crop is None or crop.size == 0:
             return np.zeros(512, dtype=np.float32)
 
-        crop_rgb = crop[:, :, ::-1]
+        crop_rgb = crop[:, :, ::-1].copy()
         
         tensor = self.transform(crop_rgb).unsqueeze(0).to(self.device)
         

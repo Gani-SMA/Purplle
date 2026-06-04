@@ -25,7 +25,10 @@ target_metadata = None
 def get_url():
     # Use sync driver for alembic command if needed, but since we are using
     # asyncpg inside the online migration runner, postgresql+asyncpg is correct.
-    return os.getenv("DATABASE_URL", "postgresql+asyncpg://user:pass@db:5432/storedb")
+    url = os.getenv("DATABASE_URL", "postgresql+asyncpg://user:pass@db:5432/storedb")
+    if url.startswith("postgresql://"):
+        url = url.replace("postgresql://", "postgresql+asyncpg://", 1)
+    return url
 
 def run_migrations_offline() -> None:
     """Run migrations in 'offline' mode.

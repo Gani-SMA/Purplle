@@ -32,6 +32,13 @@ ZONES = [
 ]
 
 STORE_CONFIGS = {
+    "STR001": {
+        "camera_id": "CAM_STR001_01",
+        "num_visitors": 428,
+        "billing_conversion": 0.45,
+        "queue_spike_prob": 0.18,
+        "avg_zones_per_visitor": 2.8,
+    },
     "STR002": {
         "camera_id": "CAM_STR002_01",
         "num_visitors": 312,

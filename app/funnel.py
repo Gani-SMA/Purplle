@@ -13,51 +13,56 @@ from models import FunnelResponse, FunnelStage
 
 logger = structlog.get_logger("funnel")
 
-_TODAY_SQL = "date_trunc('day', now() AT TIME ZONE 'UTC')"
+_TODAY_SQL = "(SELECT COALESCE(date_trunc('day', MAX(timestamp)), date_trunc('day', now() AT TIME ZONE 'UTC')) FROM events)"
 
 
 async def compute_funnel(store_id: str, db: AsyncSession) -> FunnelResponse:
+    # ── Get today's start timestamp ───────────────────────────────────────────
+    res = await db.execute(text(
+        "SELECT COALESCE(date_trunc('day', MAX(timestamp)), date_trunc('day', now() AT TIME ZONE 'UTC')) FROM events"
+    ))
+    today_start = res.scalar()
 
     # Stage 1 — unique visitors (ENTRY or REENTRY, de-duped by visitor_id)
-    s1 = await db.execute(text(f"""
+    s1 = await db.execute(text("""
         SELECT COUNT(DISTINCT visitor_id)
         FROM events
         WHERE store_id  = :sid
           AND is_staff  = false
           AND event_type IN ('ENTRY','REENTRY')
-          AND timestamp >= {_TODAY_SQL}
-    """), {"sid": store_id})
+          AND timestamp >= :today_start
+    """), {"sid": store_id, "today_start": today_start})
     entry_count: int = s1.scalar() or 0
 
     # Stage 2 — visited at least one zone
-    s2 = await db.execute(text(f"""
+    s2 = await db.execute(text("""
         SELECT COUNT(DISTINCT visitor_id)
         FROM events
         WHERE store_id  = :sid
           AND is_staff  = false
           AND event_type = 'ZONE_ENTER'
-          AND timestamp >= {_TODAY_SQL}
-    """), {"sid": store_id})
+          AND timestamp >= :today_start
+    """), {"sid": store_id, "today_start": today_start})
     zone_count: int = s2.scalar() or 0
 
     # Stage 3 — reached billing zone (joined queue)
-    s3 = await db.execute(text(f"""
+    s3 = await db.execute(text("""
         SELECT COUNT(DISTINCT visitor_id)
         FROM sessions
         WHERE store_id       = :sid
           AND reached_billing = true
-          AND entry_ts       >= {_TODAY_SQL}
-    """), {"sid": store_id})
+          AND entry_ts       >= :today_start
+    """), {"sid": store_id, "today_start": today_start})
     billing_count: int = s3.scalar() or 0
 
     # Stage 4 — converted (POS transaction matched)
-    s4 = await db.execute(text(f"""
+    s4 = await db.execute(text("""
         SELECT COUNT(DISTINCT visitor_id)
         FROM sessions
         WHERE store_id    = :sid
           AND is_converted = true
-          AND entry_ts    >= {_TODAY_SQL}
-    """), {"sid": store_id})
+          AND entry_ts    >= :today_start
+    """), {"sid": store_id, "today_start": today_start})
     purchase_count: int = s4.scalar() or 0
 
     def drop_pct(prev: int, curr: int) -> float:

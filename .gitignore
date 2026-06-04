@@ -62,3 +62,12 @@ dist-ssr/
 # Logs
 *.log
 logs/
+
+# Large Model Weights
+pipeline/models/
+*.pt
+*.onnx
+
+# Vite build timestamps
+dashboard/vite.config.ts.timestamp-*
+

@@ -66,4 +66,4 @@ class StaffClassifier:
         total_pixels = mask.size
         pct = (matching_pixels / total_pixels) * 100.0
 
-        return pct >= threshold_pct
+        return bool(pct >= threshold_pct)

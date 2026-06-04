@@ -62,6 +62,19 @@ async def seed_today():
     conn = await asyncpg.connect(DATABASE_URL)
     redis_client = aioredis.from_url(REDIS_URL, decode_responses=True)
 
+    # Check if events already exist to prevent wiping out ingested data on container restart
+    event_count = await conn.fetchval("SELECT COUNT(*) FROM events")
+    if event_count > 0:
+        print("     ℹ Events already exist. Skipping live feed seed, but refreshing Redis live statuses.")
+        # Set Redis keys anyway to make sure dashboard shows live status
+        now_utc = datetime.now(timezone.utc)
+        for store_id in STORES_CONFIG.keys():
+            await redis_client.set(f"stale_feed:{store_id}", now_utc.isoformat())
+            await redis_client.set(f"queue_depth:{store_id}", str(random.randint(1, 4)))
+        await conn.close()
+        await redis_client.aclose()
+        return
+
     print("Truncating tables for fresh seed...")
     await conn.execute("TRUNCATE events, sessions, pos_transactions, anomalies_log CASCADE;")
 

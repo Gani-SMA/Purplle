@@ -12,13 +12,18 @@ from models import HeatmapResponse, HeatmapZone
 
 logger = structlog.get_logger("heatmap")
 
-_TODAY_SQL = "date_trunc('day', now() AT TIME ZONE 'UTC')"
+_TODAY_SQL = "(SELECT COALESCE(date_trunc('day', MAX(timestamp)), date_trunc('day', now() AT TIME ZONE 'UTC')) FROM events)"
 
 
 async def compute_heatmap(store_id: str, db: AsyncSession) -> HeatmapResponse:
+    # ── Get today's start timestamp ───────────────────────────────────────────
+    res = await db.execute(text(
+        "SELECT COALESCE(date_trunc('day', MAX(timestamp)), date_trunc('day', now() AT TIME ZONE 'UTC')) FROM events"
+    ))
+    today_start = res.scalar()
 
     # Zone visit counts + average dwell
-    rows = await db.execute(text(f"""
+    rows = await db.execute(text("""
         SELECT zone_id,
                COUNT(*)          AS visit_count,
                AVG(dwell_ms)     AS avg_dwell_ms
@@ -27,19 +32,19 @@ async def compute_heatmap(store_id: str, db: AsyncSession) -> HeatmapResponse:
           AND is_staff  = false
           AND event_type = 'ZONE_ENTER'
           AND zone_id   IS NOT NULL
-          AND timestamp >= {_TODAY_SQL}
+          AND timestamp >= :today_start
         GROUP BY zone_id
         ORDER BY visit_count DESC
-    """), {"sid": store_id})
+    """), {"sid": store_id, "today_start": today_start})
     raw = rows.fetchall()   # [(zone_id, count, avg_dwell), ...]
 
     # Total sessions today (for data_confidence)
-    sc = await db.execute(text(f"""
+    sc = await db.execute(text("""
         SELECT COUNT(*)
         FROM sessions
         WHERE store_id = :sid
-          AND entry_ts >= {_TODAY_SQL}
-    """), {"sid": store_id})
+          AND entry_ts >= :today_start
+    """), {"sid": store_id, "today_start": today_start})
     total_sessions: int = sc.scalar() or 0
     data_confidence: bool = total_sessions >= 20
 

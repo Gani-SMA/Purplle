@@ -1,6 +1,6 @@
 // API Client for Purplle Store Intelligence API
 
-const API_BASE = '/api';
+const API_BASE = import.meta.env.VITE_API_URL || '/api';
 
 export interface StoreMetric {
   unique_visitors: number;
@@ -55,6 +55,65 @@ export interface StoreHealthItem {
 export interface HealthResponse {
   status: 'healthy' | 'stale';
   stores: StoreHealthItem[];
+}
+
+// ── Pipeline integration types ────────────────────────────────────────────────
+
+export interface RecentEvent {
+  event_id: string;
+  event_type: string;
+  visitor_id: string;
+  camera_id: string;
+  zone_id: string | null;
+  timestamp: string;
+  is_staff: boolean;
+  confidence: number;
+  dwell_ms: number;
+}
+
+export interface RecentEventsResponse {
+  store_id: string;
+  events: RecentEvent[];
+  total: number;
+}
+
+export interface CameraStatus {
+  camera_id: string;
+  last_seen_ts: string | null;
+  event_count_today: number;
+  lag_seconds: number | null;
+  status: 'live' | 'stale' | 'unknown';
+}
+
+export interface CameraStatusResponse {
+  store_id: string;
+  cameras: CameraStatus[];
+}
+
+export interface VisitorJourneyEvent {
+  event_type: string;
+  zone_id: string | null;
+  timestamp: string;
+  dwell_ms: number;
+  camera_id: string;
+}
+
+export interface VisitorJourneyResponse {
+  store_id: string;
+  visitor_id: string;
+  is_staff: boolean;
+  events: VisitorJourneyEvent[];
+  total_dwell_ms: number;
+  zones_visited: string[];
+}
+
+export interface PosSummaryResponse {
+  store_id: string;
+  total_transactions: number;
+  total_revenue_inr: number;
+  avg_basket_inr: number;
+  revenue_per_visitor: number;
+  hourly_revenue: { hour: number; revenue: number; transactions: number }[];
 }
 
 // Get stored API key or default to test_key_1
@@ -203,4 +262,20 @@ export const api = {
     };
   },
   getHealth: () => request<HealthResponse>('/health'),
+
+  getRecentEvents: async (storeId: string, limit = 50): Promise<RecentEventsResponse> => {
+    return request<RecentEventsResponse>(`/stores/${storeId}/events/recent?limit=${limit}`);
+  },
+
+  getCameraStatus: async (storeId: string): Promise<CameraStatusResponse> => {
+    return request<CameraStatusResponse>(`/stores/${storeId}/cameras`);
+  },
+
+  getVisitorJourney: async (storeId: string, visitorId: string): Promise<VisitorJourneyResponse> => {
+    return request<VisitorJourneyResponse>(`/stores/${storeId}/visitors/${visitorId}/journey`);
+  },
+
+  getPosSummary: async (storeId: string): Promise<PosSummaryResponse> => {
+    return request<PosSummaryResponse>(`/stores/${storeId}/pos/summary`);
+  },
 };

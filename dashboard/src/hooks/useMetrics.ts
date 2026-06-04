@@ -58,7 +58,7 @@ export function useMetrics(storeId: string) {
   }, [storeId]);
 
   // Listen for WebSocket live updates
-  const isConnected = useWebSocket(
+  const { isConnected, wsEventCount } = useWebSocket(
     storeId,
     useCallback(() => {
       console.log(`WebSocket event triggered refresh for store: ${storeId}`);
@@ -74,6 +74,7 @@ export function useMetrics(storeId: string) {
     loading,
     error,
     isConnected,
+    wsEventCount,
     lastUpdated,
     pulseMetrics,
     refetch: () => fetchData(false),

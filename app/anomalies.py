@@ -22,7 +22,7 @@ QUEUE_SPIKE_THRESHOLD        = int(os.getenv("QUEUE_SPIKE_THRESHOLD",        "5"
 CONVERSION_DROP_THRESHOLD_PCT= float(os.getenv("CONVERSION_DROP_THRESHOLD_PCT","20"))
 DEAD_ZONE_MIN                = int(os.getenv("DEAD_ZONE_MIN",                "30"))
 
-_TODAY_SQL  = "date_trunc('day', now() AT TIME ZONE 'UTC')"
+_TODAY_SQL  = "(SELECT COALESCE(date_trunc('day', MAX(timestamp)), date_trunc('day', now() AT TIME ZONE 'UTC')) FROM events)"
 _7DAYS_SQL  = "(now() AT TIME ZONE 'UTC' - INTERVAL '7 days')"
 
 
@@ -31,6 +31,12 @@ async def compute_anomalies(
     db: AsyncSession,
     redis,
 ) -> AnomalyResponse:
+    # ── Get today's start timestamp ───────────────────────────────────────────
+    res = await db.execute(text(
+        "SELECT COALESCE(date_trunc('day', MAX(timestamp)), date_trunc('day', now() AT TIME ZONE 'UTC')) FROM events"
+    ))
+    today_start = res.scalar()
+
     anomalies: list[AnomalyItem] = []
     now = datetime.now(timezone.utc)
 
@@ -47,13 +53,13 @@ async def compute_anomalies(
         ))
 
     # ── 2. CONVERSION_DROP ────────────────────────────────────────────────────
-    today_row = await db.execute(text(f"""
+    today_row = await db.execute(text("""
         SELECT
             COUNT(*) FILTER (WHERE is_converted = true) AS conv,
             COUNT(*)                                     AS total
         FROM sessions
-        WHERE store_id = :sid AND entry_ts >= {_TODAY_SQL}
-    """), {"sid": store_id})
+        WHERE store_id = :sid AND entry_ts >= :today_start
+    """), {"sid": store_id, "today_start": today_start})
     tr = today_row.fetchone()
     today_conv  = tr[0] or 0
     today_total = tr[1] or 0
@@ -66,8 +72,8 @@ async def compute_anomalies(
         FROM sessions
         WHERE store_id = :sid
           AND entry_ts >= {_7DAYS_SQL}
-          AND entry_ts <  {_TODAY_SQL}
-    """), {"sid": store_id})
+          AND entry_ts <  :today_start
+    """), {"sid": store_id, "today_start": today_start})
     wr = week_row.fetchone()
     week_conv  = wr[0] or 0
     week_total = wr[1] or 0
@@ -99,9 +105,9 @@ async def compute_anomalies(
     zone_events_recent = dz_row.scalar() or 0
 
     # Only flag if the store has had *some* activity today (avoid false positives on brand-new stores)
-    has_today_activity = await db.execute(text(f"""
-        SELECT COUNT(*) FROM events WHERE store_id = :sid AND timestamp >= {_TODAY_SQL}
-    """), {"sid": store_id})
+    has_today_activity = await db.execute(text("""
+        SELECT COUNT(*) FROM events WHERE store_id = :sid AND timestamp >= :today_start
+    """), {"sid": store_id, "today_start": today_start})
     if (has_today_activity.scalar() or 0) > 0 and zone_events_recent == 0:
         anomalies.append(AnomalyItem(
             anomaly_type="DEAD_ZONE",
