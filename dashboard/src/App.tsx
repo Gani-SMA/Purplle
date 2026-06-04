@@ -212,6 +212,24 @@ export default function App() {
           padding: '22px 26px',
           display: 'flex', flexDirection: 'column', gap: 18,
         }}>
+          {/* Offline banner */}
+          {apiHealthStatus === 'offline' && (
+            <div style={{
+              padding: '10px 16px', borderRadius: 10,
+              background: 'rgba(248,113,113,0.08)',
+              border: '1px solid rgba(248,113,113,0.22)',
+              backdropFilter: 'blur(12px)',
+              color: '#fca5a5', fontSize: 13,
+              display: 'flex', alignItems: 'center', gap: 10,
+              boxShadow: '0 0 20px rgba(248,113,113,0.08)',
+            }}>
+              <span style={{ fontSize: 15 }}>⚠️</span>
+              <span>
+                <strong>Backend API Offline</strong> — The dashboard cannot reach the server. Make sure the API Base URL in the <strong>API Settings</strong> (bottom-left of the sidebar) is correct.
+              </span>
+            </div>
+          )}
+
           {/* Error banner */}
           {error && (
             <div style={{
