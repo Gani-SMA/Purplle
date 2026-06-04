@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { getApiBaseUrl } from '../api';
 
 interface WebSocketMessage {
   event_types: string[];
@@ -23,7 +24,7 @@ export function useWebSocket(storeId: string, onMessage: (msg: WebSocketMessage)
       if (import.meta.env.VITE_WS_URL) {
         wsUrl = `${import.meta.env.VITE_WS_URL}/ws/stores/${storeId}`;
       } else {
-        const apiBase = import.meta.env.VITE_API_URL || '';
+        const apiBase = getApiBaseUrl();
         if (apiBase.startsWith('http://') || apiBase.startsWith('https://')) {
           const wsProtocol = apiBase.startsWith('https://') ? 'wss:' : 'ws:';
           const host = apiBase.replace(/^https?:\/\//, '');

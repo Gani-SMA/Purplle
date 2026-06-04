@@ -1,6 +1,18 @@
 // API Client for Purplle Store Intelligence API
 
-const API_BASE = import.meta.env.VITE_API_URL || '/api';
+export function getApiBaseUrl(): string {
+  const storedUrl = localStorage.getItem('purplle_api_url');
+  if (storedUrl) return storedUrl;
+  return import.meta.env.VITE_API_URL || '/api';
+}
+
+export function setApiBaseUrl(url: string) {
+  if (!url) {
+    localStorage.removeItem('purplle_api_url');
+  } else {
+    localStorage.setItem('purplle_api_url', url.trim());
+  }
+}
 
 export interface StoreMetric {
   unique_visitors: number;
@@ -183,7 +195,7 @@ async function request<T>(path: string): Promise<T> {
     'Content-Type': 'application/json',
   };
 
-  const response = await fetch(`${API_BASE}${path}`, { headers });
+  const response = await fetch(`${getApiBaseUrl()}${path}`, { headers });
   
   if (!response.ok) {
     if (response.status === 401) {

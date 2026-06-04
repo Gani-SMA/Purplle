@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { Store, Key, RefreshCw, Activity, MapPin } from 'lucide-react';
-import { getApiKey, setApiKey } from '../api';
+import { Store, Settings, RefreshCw, Activity, MapPin } from 'lucide-react';
+import { getApiKey, setApiKey, getApiBaseUrl, setApiBaseUrl } from '../api';
 
 interface SidebarProps {
   currentStoreId: string;
@@ -22,13 +22,15 @@ const HEALTH_COLOR: Record<string, string> = {
 };
 
 export function Sidebar({ currentStoreId, onStoreChange, apiHealth, onRefreshHealth }: SidebarProps) {
-  const [showKey, setShowKey] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
   const [keyInput, setKeyInput] = useState(getApiKey());
+  const [apiUrlInput, setApiUrlInput] = useState(getApiBaseUrl());
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
     setApiKey(keyInput);
-    setShowKey(false);
+    setApiBaseUrl(apiUrlInput);
+    setShowSettings(false);
     window.location.reload();
   };
 
@@ -209,9 +211,9 @@ export function Sidebar({ currentStoreId, onStoreChange, apiHealth, onRefreshHea
           </div>
         </button>
 
-        {/* API Key */}
+        {/* API Settings */}
         <button
-          onClick={() => setShowKey(v => !v)}
+          onClick={() => setShowSettings(v => !v)}
           style={{
             display: 'flex', alignItems: 'center', gap: 8,
             width: '100%', padding: '9px 12px', borderRadius: 9,
@@ -238,27 +240,46 @@ export function Sidebar({ currentStoreId, onStoreChange, apiHealth, onRefreshHea
             el.style.transform = '';
           }}
         >
-          <Key style={{ width: 12, height: 12 }} />
-          API Key
+          <Settings style={{ width: 12, height: 12 }} />
+          API Settings
         </button>
 
-        {showKey && (
-          <form onSubmit={handleSave} style={{ marginTop: 9 }}>
-            <input
-              type="password"
-              value={keyInput}
-              onChange={e => setKeyInput(e.target.value)}
-              placeholder="x-api-key"
-              style={{
-                width: '100%', padding: '7px 10px', borderRadius: 7,
-                background: 'rgba(0,0,0,0.35)',
-                border: '1px solid rgba(129,140,248,0.25)',
-                color: '#f0f0f8', fontSize: 12, marginBottom: 7,
-                outline: 'none',
-              }}
-            />
+        {showSettings && (
+          <form onSubmit={handleSave} style={{ marginTop: 9, display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <div>
+              <label style={{ fontSize: 10, color: 'rgba(148,148,180,0.7)', display: 'block', marginBottom: 3, fontWeight: 600 }}>API Base URL</label>
+              <input
+                type="text"
+                value={apiUrlInput}
+                onChange={e => setApiUrlInput(e.target.value)}
+                placeholder="https://api.onrender.com"
+                style={{
+                  width: '100%', padding: '7px 10px', borderRadius: 7,
+                  background: 'rgba(0,0,0,0.35)',
+                  border: '1px solid rgba(129,140,248,0.25)',
+                  color: '#f0f0f8', fontSize: 11,
+                  outline: 'none',
+                }}
+              />
+            </div>
+            <div>
+              <label style={{ fontSize: 10, color: 'rgba(148,148,180,0.7)', display: 'block', marginBottom: 3, fontWeight: 600 }}>API Key</label>
+              <input
+                type="password"
+                value={keyInput}
+                onChange={e => setKeyInput(e.target.value)}
+                placeholder="x-api-key"
+                style={{
+                  width: '100%', padding: '7px 10px', borderRadius: 7,
+                  background: 'rgba(0,0,0,0.35)',
+                  border: '1px solid rgba(129,140,248,0.25)',
+                  color: '#f0f0f8', fontSize: 11,
+                  outline: 'none',
+                }}
+              />
+            </div>
             <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
-              <button type="button" onClick={() => setShowKey(false)} style={{
+              <button type="button" onClick={() => setShowSettings(false)} style={{
                 fontSize: 11, color: 'var(--text-3)',
                 background: 'none', border: 'none', cursor: 'pointer',
               }}>Cancel</button>
