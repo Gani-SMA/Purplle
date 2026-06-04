@@ -43,4 +43,4 @@ services:
         destination: /index.html
     envVars:
       - key: VITE_API_URL
-        value: https://store-intelligence-api.onrender.com
+        value: https://store-intelligence-api-sydb.onrender.com
