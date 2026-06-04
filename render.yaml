@@ -16,7 +16,6 @@ services:
     dockerfilePath: app/Dockerfile
     dockerContext: .
     plan: free
-    startCommand: alembic upgrade head && python seed.py && python seed_live.py && python -m uvicorn main:app --host 0.0.0.0 --port $PORT
     envVars:
       - key: DATABASE_URL
         fromDatabase:
